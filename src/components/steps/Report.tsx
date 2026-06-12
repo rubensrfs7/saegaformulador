@@ -1,0 +1,283 @@
+import { Printer } from 'lucide-react';
+import { FormulationState } from '../../types';
+import { MOCK_INGREDIENTS, CONSUMPTION_TARGETS } from '../../data';
+
+interface Props {
+  data: FormulationState;
+}
+
+export default function Report({ data }: Props) {
+  
+  const currentTarget = CONSUMPTION_TARGETS.find(t => t.category === data.category && t.subcategory === data.subcategory);
+  const weight = Number(data.weight) || 0;
+  
+  const metaCMS = currentTarget ? weight * (currentTarget.percentPvMs / 100) : weight * 0.03;
+  const metaConcentrado = currentTarget ? metaCMS * (currentTarget.concentradoPercent / 100) : metaCMS * 0.35;
+  const metaVolumoso = currentTarget ? metaCMS * (currentTarget.volumosoPercent / 100) : metaCMS * 0.65;
+
+  const animais = Number(data.quantity) || 1;
+
+  const currentConcentrateMS = data.concentrates.reduce((sum, entry) => {
+    const mn = Number(entry.mn) || 0;
+    const info = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
+    return sum + (mn && info?.msPercent ? mn * (info.msPercent / 100) : 0);
+  }, 0);
+  
+  const currentVolumosoMS = data.volumosos.reduce((sum, entry) => {
+    const mn = Number(entry.mn) || 0;
+    const info = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
+    return sum + (mn && info?.msPercent ? mn * (info.msPercent / 100) : 0);
+  }, 0);
+
+  const resolveEntries = (entries: any[], currentGroupMS: number, metaGroupMS: number) => {
+    let totalMS = 0;
+    const resolved = entries.map(entry => {
+      const itemInfo = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
+      if (!itemInfo) return null;
+      
+      const originalMS = (Number(entry.mn) || 0) * (itemInfo.msPercent / 100);
+      const proportion = currentGroupMS > 0 ? originalMS / currentGroupMS : 0;
+      
+      const scaledMSpA = proportion * metaGroupMS;
+      const scaledMNpA = itemInfo.msPercent ? scaledMSpA / (itemInfo.msPercent / 100) : 0;
+      
+      const msValue = scaledMSpA * animais;
+      const mnValue = scaledMNpA * animais;
+      
+      totalMS += msValue;
+      return { ...entry, itemInfo, msValue, mnValue };
+    }).filter(Boolean);
+    return { resolved, totalMS };
+  }
+
+  const conc = resolveEntries(data.concentrates, currentConcentrateMS, metaConcentrado);
+  const vol = resolveEntries(data.volumosos, currentVolumosoMS, metaVolumoso);
+  
+  const allEntries = [...conc.resolved, ...vol.resolved];
+  const globalTotalMS = conc.totalMS + vol.totalMS;
+  const globalTotalMN = allEntries.reduce((s, x) => s + (x?.mnValue || 0), 0);
+  const concTotalMN = conc.resolved.reduce((s, x) => s + (x?.mnValue || 0), 0);
+  const volTotalMN = vol.resolved.reduce((s, x) => s + (x?.mnValue || 0), 0);
+
+  let totalPB = 0, totalNDT = 0, totalFDN = 0, totalAmido = 0;
+  
+  allEntries.forEach(c => {
+    if(!c) return;
+    totalPB += c.msValue * (c.itemInfo?.pb || 0);
+    totalNDT += c.msValue * (c.itemInfo?.ndt || 0);
+    totalFDN += c.msValue * (c.itemInfo?.fdn || 0);
+    totalAmido += c.msValue * (c.itemInfo?.amido || 0);
+  });
+
+  return (
+    <div className="max-w-4xl mx-auto pb-12">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-sm font-bold text-gray-400 tracking-widest uppercase">Visualizar</h2>
+        <button 
+          onClick={() => window.print()}
+          className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
+        >
+          <Printer size={18} /> Imprimir
+        </button>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-md border border-gray-100 p-12 print:shadow-none print:border-none">
+        
+        {/* Header */}
+        <div className="flex justify-between items-end border-b-4 border-blue-600 pb-4 mb-8">
+          <img src="https://preview.saega.com.br/version_2_final/assets/logotipo-so-CgB1U75J.png" alt="Saega" className="h-10" referrerPolicy="no-referrer" />
+          <div className="text-sm font-bold text-gray-400">DATA: {new Date().toLocaleDateString('pt-BR')}</div>
+        </div>
+
+        <div className="text-center mb-12">
+          <h1 className="text-sm font-bold text-gray-400 tracking-widest uppercase mb-2">Relatório Nutricional</h1>
+          <h2 className="text-2xl font-black text-blue-700 uppercase">{data.name || 'Fórmula Sem Nome'}</h2>
+        </div>
+
+        <section className="mb-10">
+          <h3 className="text-xs font-bold text-blue-700 tracking-wider mb-4">1. PERFIL DO ANIMAL</h3>
+          <div className="bg-gray-50 rounded-xl p-5 flex flex-wrap gap-8">
+            <div>
+              <div className="text-[10px] font-bold text-gray-400 mb-1">CATEGORIA</div>
+              <div className="text-sm font-bold text-gray-800">{data.category || '-'}</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold text-gray-400 mb-1">SUBCATEGORIA</div>
+              <div className="text-sm font-bold text-gray-800">{data.subcategory || '-'}</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold text-gray-400 mb-1">PESO</div>
+              <div className="text-sm font-bold text-gray-800">{data.weight || '-'} kg</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold text-gray-400 mb-1">QUANTIDADE DE ANIMAIS</div>
+              <div className="text-sm font-bold text-gray-800">{data.quantity || '1'}</div>
+            </div>
+          </div>
+        </section>
+
+        <section className="mb-10">
+          <h3 className="text-xs font-bold text-blue-700 tracking-wider mb-4">2. METAS DE CONSUMO</h3>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-gray-50 rounded-xl p-5">
+              <div className="text-[10px] font-bold text-gray-400 mb-3">META DE CMS</div>
+              <div className="text-xl font-black text-gray-800">{metaCMS.toFixed(2).replace(/\.00$/, '')} kg/dia</div>
+            </div>
+            <div className="bg-[#fffcf8] border border-orange-100 rounded-xl p-5">
+              <div className="text-[10px] font-bold text-orange-600 mb-3">META DE CONCENTRADO</div>
+              <div className="text-xl font-black text-gray-800 mb-1">{metaConcentrado.toFixed(2).replace(/\.00$/, '')} kg MS</div>
+              <div className="text-xs font-bold text-orange-500">{currentTarget?.concentradoPercent || 35}%</div>
+            </div>
+            <div className="bg-[#f0fdf4] border border-green-100 rounded-xl p-5">
+              <div className="text-[10px] font-bold text-green-700 mb-3">META DE VOLUMOSO</div>
+              <div className="text-xl font-black text-gray-800 mb-1">{metaVolumoso.toFixed(2).replace(/\.00$/, '')} kg MS</div>
+              <div className="text-xs font-bold text-green-600">{currentTarget?.volumosoPercent || 65}%</div>
+            </div>
+          </div>
+        </section>
+
+        <section className="mb-10">
+          <h3 className="text-xs font-bold text-blue-700 tracking-wider mb-4">3. FÓRMULA DO CONCENTRADO</h3>
+          <div className="border border-gray-200 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left font-bold text-gray-400 text-[10px] uppercase p-4">Insumo</th>
+                  <th className="text-right font-bold text-gray-400 text-[10px] uppercase p-4">Quantidade</th>
+                  <th className="text-right font-bold text-gray-400 text-[10px] uppercase p-4">% Mistura</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {conc.resolved.map((item, idx) => (
+                  <tr key={idx} className="bg-white">
+                    <td className="p-4 text-gray-700 font-medium">{item?.itemInfo?.name}</td>
+                    <td className="p-4 text-right font-bold">{item?.mnValue.toFixed(2)} kg</td>
+                    <td className="p-4 text-right text-gray-500">
+                      {concTotalMN > 0 ? ((item!.mnValue / concTotalMN) * 100).toFixed(1) : 0}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-[#fff8eb] border-t border-orange-100">
+                <tr>
+                  <td colSpan={3} className="p-4">
+                    <div className="flex justify-between items-center text-orange-700">
+                      <div className="font-bold text-xs">TOTAL CONCENTRADO</div>
+                      <div className="flex gap-12 font-black">
+                        <div>{concTotalMN.toFixed(2)} kg MN</div>
+                        <div>100%</div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </section>
+
+        <section className="mb-10">
+          <h3 className="text-xs font-bold text-blue-700 tracking-wider mb-4">4. VOLUMOSO</h3>
+          <div className="border border-gray-200 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left font-bold text-gray-400 text-[10px] uppercase p-4">Insumo</th>
+                  <th className="text-right font-bold text-gray-400 text-[10px] uppercase p-4">Quantidade</th>
+                  <th className="text-right font-bold text-gray-400 text-[10px] uppercase p-4">% Mistura</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {vol.resolved.map((item, idx) => (
+                  <tr key={idx} className="bg-white">
+                    <td className="p-4 text-gray-700 font-medium">{item?.itemInfo?.name}</td>
+                    <td className="p-4 text-right font-bold">{item?.mnValue.toFixed(2)} kg</td>
+                    <td className="p-4 text-right text-gray-500">
+                      {volTotalMN > 0 ? ((item!.mnValue / volTotalMN) * 100).toFixed(1) : 0}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-[#f0fdf4] border-t border-green-100">
+                <tr>
+                  <td colSpan={3} className="p-4">
+                    <div className="flex justify-between items-center text-green-700">
+                      <div className="font-bold text-xs uppercase">Total Volumoso</div>
+                      <div className="flex gap-12 font-black text-right pr-4">
+                        <div>{volTotalMN.toFixed(2)} kg MN</div>
+                        <div>100%</div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </section>
+
+        <section className="mb-12">
+          <h3 className="text-xs font-bold text-blue-700 tracking-wider mb-4">5. DIETA TOTAL</h3>
+          <div className="border border-gray-200 rounded-xl overflow-hidden">
+            <table className="w-full text-sm text-center">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left font-bold text-gray-500 text-[10px] uppercase p-4">Insumo</th>
+                  <th className="text-right font-bold text-gray-500 text-[10px] uppercase p-4">MN (kg)</th>
+                  <th className="text-right font-bold text-gray-500 text-[10px] uppercase p-4">MS (kg)</th>
+                  <th className="text-right font-bold text-gray-500 text-[10px] uppercase p-4">% Mistura MS</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {allEntries.map((item, idx) => (
+                  <tr key={idx} className="bg-white">
+                    <td className="p-4 text-left text-gray-700 font-bold">{item?.itemInfo?.name}</td>
+                    <td className="p-4 text-right font-medium">{item?.mnValue.toFixed(2)}</td>
+                    <td className="p-4 text-right font-medium">{item?.msValue.toFixed(2)}</td>
+                    <td className="p-4 text-right text-gray-500">
+                      {globalTotalMS > 0 ? ((item!.msValue / globalTotalMS) * 100).toFixed(1) : 0}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-blue-600 border-t border-blue-700 text-white">
+                <tr>
+                  <td colSpan={4} className="p-4">
+                    <div className="flex justify-between items-center mb-4 text-blue-100">
+                      <div className="font-bold text-xs uppercase text-white">Total MS da Dieta</div>
+                      <div className="flex gap-4 font-black text-right text-white">
+                        <div>{globalTotalMS.toFixed(2)} kg MS</div>
+                        <div>100%</div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col sm:flex-row justify-around items-center border-t border-blue-500 mt-2 pt-6 pb-2 gap-4">
+                       <div className="text-center">
+                         <div className="text-[10px] font-bold mb-1 tracking-wider text-blue-200">TOTAL MN DA DIETA (1 ANIMAL)</div>
+                         <div className="text-3xl font-black text-white">{(globalTotalMN / animais).toFixed(2)} kg</div>
+                       </div>
+                       <div className="h-10 w-px bg-blue-500 hidden sm:block"></div>
+                       <div className="text-center">
+                         <div className="text-[10px] font-bold mb-1 tracking-wider text-blue-200">TOTAL MN DA DIETA ({animais} ANIMAIS)</div>
+                         <div className="text-3xl font-black text-white">{globalTotalMN.toFixed(2)} kg</div>
+                       </div>
+                    </div>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </section>
+
+        <div className="border-t border-gray-100 pt-8 flex justify-between items-end">
+          <div>
+            <div className="text-[10px] font-bold text-gray-400 mb-1 tracking-widest uppercase">Responsável Técnico</div>
+            <div className="text-sm font-bold text-gray-800">Neide Almeida</div>
+            <div className="text-xs font-bold text-gray-400 mt-1">CRMV n° 000000</div>
+          </div>
+          <div className="text-[10px] font-bold text-gray-300 tracking-widest uppercase">
+            GERADO VIA SAEGA
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Saega Formulador de Nutrição",
+  "description": "App multi-step para formular e analisar dietas de animais em tempo real.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
