@@ -79,6 +79,17 @@ export const MOCK_INGREDIENTS: IngredientDef[] = [
   { id: 'm1', name: 'Núcleo Lactação 4%', type: 'Mineral', pb: 0, ndt: 0, fdn: 0, amido: 0, calcio: 170, fosforo: 52.5, msPercent: 100 },
   { id: 'm2', name: 'Núcleo Novilhas 6%', type: 'Mineral', pb: 0, ndt: 0, fdn: 0, amido: 0, calcio: 150, fosforo: 75, msPercent: 100 },
   { id: 'm3', name: 'Salmineral Pronto Uso Lactação', type: 'Mineral', pb: 0, ndt: 0, fdn: 0, amido: 0, calcio: 150, fosforo: 78, msPercent: 100 },
-  { id: 'm4', name: 'Núcleo Pré Parto 8%', type: 'Mineral', pb: 0, ndt: 0, fdn: 0, amido: 0, calcio: 120, fosforo: 30, msPercent: 100 }
+  { id: 'm4', name: 'Núcleo Pré Parto 8%', type: 'Mineral', pb: 0, ndt: 0, fdn: 0, amido: 0, calcio: 120, fosforo: 30, msPercent: 100 },
+  { id: 'm5', name: 'Núcleo Bezerra Aleitamento 6%', type: 'Mineral', pb: 0, ndt: 0, fdn: 0, amido: 0, calcio: 150, fosforo: 70, msPercent: 97 },
+  { id: 'm6', name: 'Núcleo Básico Lactação 3%', type: 'Mineral', pb: 0, ndt: 0, fdn: 0, amido: 0, calcio: 200, fosforo: 60, msPercent: 97 },
+  { id: 'm7', name: 'Núcleo Lactação a 3% com Monesin', type: 'Mineral', pb: 0, ndt: 0, fdn: 0, amido: 0, calcio: 200, fosforo: 60, msPercent: 97 },
+  { id: 'm8', name: 'Núcleo Lactação 6%', type: 'Mineral', pb: 0, ndt: 0, fdn: 0, amido: 0, calcio: 116, fosforo: 35, msPercent: 97 },
+  { id: 'm9', name: 'Bicarbonato Sódio', type: 'Mineral', pb: 0, ndt: 0, fdn: 0, amido: 0, calcio: 0, fosforo: 0, msPercent: 97 },
+  { id: 'm10', name: 'Calcario Calcitico 36', type: 'Mineral', pb: 0, ndt: 0, fdn: 0, amido: 0, calcio: 360, fosforo: 0, msPercent: 97 },
+  { id: 'm11', name: 'Fosfato Bicálcico', type: 'Mineral', pb: 0, ndt: 0, fdn: 0, amido: 0, calcio: 240, fosforo: 185, msPercent: 97 },
+  { id: 'm12', name: 'Sal comum (NaCl)', type: 'Mineral', pb: 0, ndt: 0, fdn: 0, amido: 0, calcio: 0, fosforo: 0, msPercent: 97 },
+  { id: 'm13', name: 'Óxido magnesio', type: 'Mineral', pb: 0, ndt: 0, fdn: 0, amido: 0, calcio: 0, fosforo: 0, msPercent: 97 },
+  { id: 'm14', name: 'Enxofre elementar (flor de enxofre)', type: 'Mineral', pb: 0, ndt: 0, fdn: 0, amido: 0, calcio: 0, fosforo: 0, msPercent: 97 },
+  { id: 'm15', name: 'Monensina sódica 10%', type: 'Mineral', pb: 0, ndt: 0, fdn: 0, amido: 0, calcio: 0, fosforo: 0, msPercent: 97 }
 ];
 
