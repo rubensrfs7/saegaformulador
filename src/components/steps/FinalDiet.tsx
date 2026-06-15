@@ -34,29 +34,20 @@ export default function FinalDiet({ data }: Props) {
   let totalCalcio = 0;
   let totalFosforo = 0;
   
-  let metaConcentradoMN = 0;
-  let metaVolumosoMN = 0;
-
   const resolvedDiet = [
     ...data.concentrates.map(entry => {
       const itemInfo = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
       if (!itemInfo) return null;
-      const originalMS = (Number(entry.mn) || 0) * (itemInfo.msPercent / 100);
-      const proportion = currentConcentrateMS > 0 ? originalMS / currentConcentrateMS : 0;
-      const scaledMS = proportion * metaConcentrado;
-      const scaledMN = itemInfo.msPercent ? scaledMS / (itemInfo.msPercent / 100) : 0;
-      metaConcentradoMN += scaledMN;
-      return { ...entry, itemInfo, msValue: scaledMS, mnValue: scaledMN };
+      const mnValue = Number(entry.mn) || 0;
+      const msValue = entry.ms !== '' ? Number(entry.ms) : mnValue * (itemInfo.msPercent / 100);
+      return { ...entry, itemInfo, msValue, mnValue };
     }),
     ...data.volumosos.map(entry => {
       const itemInfo = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
       if (!itemInfo) return null;
-      const originalMS = (Number(entry.mn) || 0) * (itemInfo.msPercent / 100);
-      const proportion = currentVolumosoMS > 0 ? originalMS / currentVolumosoMS : 0;
-      const scaledMS = proportion * metaVolumoso;
-      const scaledMN = itemInfo.msPercent ? scaledMS / (itemInfo.msPercent / 100) : 0;
-      metaVolumosoMN += scaledMN;
-      return { ...entry, itemInfo, msValue: scaledMS, mnValue: scaledMN };
+      const mnValue = Number(entry.mn) || 0;
+      const msValue = entry.ms !== '' ? Number(entry.ms) : mnValue * (itemInfo.msPercent / 100);
+      return { ...entry, itemInfo, msValue, mnValue };
     })
   ].filter(Boolean) as { ingredientId: string, mn: string, itemInfo: typeof MOCK_INGREDIENTS[0], msValue: number, mnValue: number }[];
 
@@ -71,21 +62,17 @@ export default function FinalDiet({ data }: Props) {
     totalFosforo += c.msValue * (c.itemInfo?.fosforo || 0);
   });
 
-  const getNutrientColor = (nutrient: string, value: number) => {
-    if (!currentTarget) return 'text-gray-800';
-    if (nutrient === 'PB' && currentTarget.pbTmr) {
-      return value >= currentTarget.pbTmr ? 'text-green-600' : 'text-red-500';
-    }
-    if (nutrient === 'NDT' && currentTarget.ndtTmr) {
-      return value >= currentTarget.ndtTmr ? 'text-green-600' : 'text-red-500';
-    }
-    if (nutrient === 'FDN' && currentTarget.fdnTmr) {
-      return value <= currentTarget.fdnTmr ? 'text-green-600' : 'text-red-500'; // FDN usually you want up to target? Or just use >= too? The prompt says "se caso eu conseguir chegar o nível de exigência". Usually FDN is max or exactly matched. I'll use >= since user said "chegar" (reach)
-    }
-    if (nutrient === 'AMIDO' && currentTarget.amidoPercent) {
-      return value <= (currentTarget.amidoPercent * 10) ? 'text-green-600' : 'text-red-500'; // Usually max amido. But wait, I'll use >= for everything unless otherwise. But "chegar" in FDN and Amido might mean max. Let's just do >= for consistency, or exact. Wait, usually we want NDT and PB to be high, FDN to be a certain amount. I'll just use >= for all to be simple, if it's over it's green. But actually Amido you want max. I will just do >= for all to mean "met the target".
-    }
-    return 'text-gray-800';
+  const getNutrientColor = (value: number, target: number) => {
+    if (!target) return 'text-gray-800';
+    
+    // Vermelho: abaixo da meta significativamente (< 90%)
+    if (value < target * 0.90) return 'text-red-500';
+    
+    // Amarelo: chegando na meta (90% - 98%)
+    if (value < target * 0.98) return 'text-yellow-600';
+    
+    // Verde: dentro do aceitável / muito próximo para cima (>= 98%)
+    return 'text-green-600';
   };
 
 
@@ -188,13 +175,13 @@ export default function FinalDiet({ data }: Props) {
                   {renderIndicator(card.value, card.target, card.label)}
                 </div>
                 <div className="flex items-baseline gap-1">
-                  <div className={`text-xl font-bold ${getNutrientColor(card.label, card.value)}`}>
+                  <div className={`text-xl font-bold ${getNutrientColor(card.value, card.target)}`}>
                     {card.value.toFixed(2).replace(/\.00$/, '')}
                   </div>
                   <div className="text-xs font-medium text-gray-500">g/kg</div>
                 </div>
                 <div className={`flex justify-between items-center mt-1`}>
-                  <div className={`text-xs font-semibold ${getNutrientColor(card.label, card.value)}`}>
+                  <div className={`text-xs font-semibold ${getNutrientColor(card.value, card.target)}`}>
                     {(card.value / 10).toFixed(2).replace(/\.00$/, '')}%
                   </div>
                   {card.target > 0 && (
@@ -219,15 +206,15 @@ export default function FinalDiet({ data }: Props) {
 
             <div className="flex gap-6">
                <div>
-                  <div className="text-[10px] font-bold text-orange-600 tracking-wider uppercase mb-1">Concentrado ({currentTarget?.concentradoPercent || 35}%)</div>
+                  <div className="text-[10px] font-bold text-orange-600 tracking-wider uppercase mb-1">Concentrado</div>
                   <div className="text-2xl font-black text-orange-600">
-                    {metaConcentradoMN.toFixed(2).replace(/\.00$/, '')} <span className="text-sm font-bold">Kg MN</span>
+                    {data.concentrates.reduce((sum, c) => sum + (Number(c.mn) || 0), 0).toFixed(2).replace(/\.00$/, '')} <span className="text-sm font-bold">Kg MN</span>
                   </div>
                </div>
                <div>
-                  <div className="text-[10px] font-bold text-green-700 tracking-wider uppercase mb-1">Volumoso ({currentTarget?.volumosoPercent || 65}%)</div>
+                  <div className="text-[10px] font-bold text-green-700 tracking-wider uppercase mb-1">Volumoso</div>
                   <div className="text-2xl font-black text-green-700">
-                    {metaVolumosoMN.toFixed(2).replace(/\.00$/, '')} <span className="text-sm font-bold">Kg MN</span>
+                    {data.volumosos.reduce((sum, v) => sum + (Number(v.mn) || 0), 0).toFixed(2).replace(/\.00$/, '')} <span className="text-sm font-bold">Kg MN</span>
                   </div>
                </div>
             </div>

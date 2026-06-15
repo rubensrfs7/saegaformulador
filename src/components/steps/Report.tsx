@@ -32,20 +32,14 @@ export default function Report({ data }: Props) {
     return sum + ms;
   }, 0);
 
-  const resolveEntries = (entries: any[], currentGroupMS: number, metaGroupMS: number) => {
+  const resolveRawEntries = (entries: any[]) => {
     let totalMS = 0;
     const resolved = entries.map(entry => {
       const itemInfo = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
       if (!itemInfo) return null;
       
-      const originalMS = entry.ms !== '' && entry.ms !== undefined ? Number(entry.ms) : (Number(entry.mn) || 0) * (itemInfo.msPercent / 100);
-      const proportion = currentGroupMS > 0 ? originalMS / currentGroupMS : 0;
-      
-      const scaledMSpA = proportion * metaGroupMS;
-      const scaledMNpA = itemInfo.msPercent ? scaledMSpA / (itemInfo.msPercent / 100) : 0;
-      
-      const msValue = scaledMSpA;
-      const mnValue = scaledMNpA;
+      const mnValue = Number(entry.mn) || 0;
+      const msValue = entry.ms !== '' && entry.ms !== undefined ? Number(entry.ms) : mnValue * (itemInfo.msPercent / 100);
       
       totalMS += msValue;
       return { ...entry, itemInfo, msValue, mnValue };
@@ -53,8 +47,8 @@ export default function Report({ data }: Props) {
     return { resolved, totalMS };
   }
 
-  const conc = resolveEntries(data.concentrates, currentConcentrateMS, metaConcentrado);
-  const vol = resolveEntries(data.volumosos, currentVolumosoMS, metaVolumoso);
+  const conc = resolveRawEntries(data.concentrates);
+  const vol = resolveRawEntries(data.volumosos);
   
   const allEntries = [...conc.resolved, ...vol.resolved];
   const globalTotalMS = conc.totalMS + vol.totalMS;
@@ -264,6 +258,15 @@ export default function Report({ data }: Props) {
           
           <div className="mb-6 border border-gray-200 rounded-xl overflow-hidden">
             <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="py-4 px-6 text-left font-bold text-gray-400 text-[10px] uppercase hidden sm:table-cell">Categoria</th>
+                  <th className="py-4 px-4 text-left font-bold text-gray-400 text-[10px] uppercase">Insumo</th>
+                  <th className="py-4 px-4 text-right font-bold text-gray-400 text-[10px] uppercase">MN (kg)</th>
+                  <th className="py-4 px-4 text-right font-bold text-gray-400 text-[10px] uppercase">MS (kg)</th>
+                  <th className="py-4 px-6 text-right font-bold text-gray-400 text-[10px] uppercase">% MS</th>
+                </tr>
+              </thead>
               <tbody className="divide-y divide-gray-100">
                 {allEntries.map((item, idx) => (
                   <tr key={idx} className="bg-white">
@@ -370,24 +373,24 @@ export default function Report({ data }: Props) {
                     <tr className="bg-white">
                       <td className="py-4 px-6 font-bold text-gray-700 flex items-center gap-2">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase border bg-orange-50 text-orange-600 border-orange-200">C</span>
-                        Concentrado
+                        Total Concentrado
                       </td>
                       <td className="py-4 px-6 text-right font-bold text-blue-600">{(concTotalMN * animais).toFixed(2).replace(/\.00$/, '')} kg</td>
                       <td className="py-4 px-6 text-right font-bold text-blue-700">{(concTotalMN * animais * days).toFixed(2).replace(/\.00$/, '')} kg</td>
                       <td className="py-4 px-6 text-right text-gray-500 font-medium">{(conc.totalMS * animais * days).toFixed(2).replace(/\.00$/, '')} kg</td>
                     </tr>
                   )}
-                  {volTotalMN > 0 && (
-                    <tr className="bg-white">
+                  {vol.resolved.map((item, idx) => (
+                    <tr key={`vol-${idx}`} className="bg-white">
                       <td className="py-4 px-6 font-bold text-gray-700 flex items-center gap-2">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase border bg-green-50 text-green-600 border-green-200">V</span>
-                        Volumoso
+                        {item.itemInfo?.name}
                       </td>
-                      <td className="py-4 px-6 text-right font-bold text-blue-600">{(volTotalMN * animais).toFixed(2).replace(/\.00$/, '')} kg</td>
-                      <td className="py-4 px-6 text-right font-bold text-blue-700">{(volTotalMN * animais * days).toFixed(2).replace(/\.00$/, '')} kg</td>
-                      <td className="py-4 px-6 text-right text-gray-500 font-medium">{(vol.totalMS * animais * days).toFixed(2).replace(/\.00$/, '')} kg</td>
+                      <td className="py-4 px-6 text-right font-bold text-blue-600">{(item.mnValue * animais).toFixed(2).replace(/\.00$/, '')} kg</td>
+                      <td className="py-4 px-6 text-right font-bold text-blue-700">{(item.mnValue * animais * days).toFixed(2).replace(/\.00$/, '')} kg</td>
+                      <td className="py-4 px-6 text-right text-gray-500 font-medium">{(item.msValue * animais * days).toFixed(2).replace(/\.00$/, '')} kg</td>
                     </tr>
-                  )}
+                  ))}
                 </tbody>
                 <tfoot className="bg-[#f0f9ff] border-t border-blue-200">
                   <tr>

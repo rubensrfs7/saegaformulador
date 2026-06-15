@@ -12,22 +12,12 @@ export default function Volumoso({ data, updateData }: Props) {
     const defaultIngredient = MOCK_INGREDIENTS.find(i => i.type === type) || MOCK_INGREDIENTS.find(i => i.type === 'Volumoso');
     if (!defaultIngredient) return;
 
-    // Default MS to fill remaining metaVolumoso
-    const currentMS = data.volumosos.reduce((sum, entry) => {
-      const mn = Number(entry.mn) || 0;
-      const info = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
-      return sum + (mn && info?.msPercent ? mn * (info.msPercent / 100) : 0);
-    }, 0);
-    
-    const remainingMS = Math.max(0, metaVolumoso - currentMS);
-    const defaultMN = defaultIngredient.msPercent ? remainingMS / (defaultIngredient.msPercent / 100) : 0;
-
     const newEntry: IngredientEntry = {
       id: Math.random().toString(36).substring(7),
       ingredientId: defaultIngredient.id,
       type,
-      mn: defaultMN || '',
-      ms: remainingMS || ''
+      mn: '',
+      ms: ''
     };
     updateData({ volumosos: [...data.volumosos, newEntry] });
   };
@@ -47,15 +37,25 @@ export default function Volumoso({ data, updateData }: Props) {
         let updated = { ...c, [field]: value };
 
         if (field === 'mn') {
-          const mn = value === '' ? 0 : Number(value);
-          updated.ms = mn * (itemInfo.msPercent / 100);
+          if (value === '') {
+            updated.ms = '';
+          } else {
+            const mn = Number(value);
+            updated.ms = mn * (itemInfo.msPercent / 100);
+          }
         } else if (field === 'ms') {
-          const ms = value === '' ? 0 : Number(value);
-          updated.mn = itemInfo.msPercent ? ms / (itemInfo.msPercent / 100) : 0;
+          if (value === '') {
+            updated.mn = '';
+          } else {
+            const ms = Number(value);
+            updated.mn = itemInfo.msPercent ? ms / (itemInfo.msPercent / 100) : 0;
+          }
         } else if (field === 'ingredientId') {
           // If ingredient changes, keep MS fixed (cravado) and update MN
-          const ms = Number(c.ms) || 0;
-          updated.mn = itemInfo.msPercent ? ms / (itemInfo.msPercent / 100) : 0;
+          if (c.ms !== '' && c.ms !== undefined) {
+            const ms = Number(c.ms);
+            updated.mn = itemInfo.msPercent ? ms / (itemInfo.msPercent / 100) : 0;
+          }
         }
 
         return updated;
