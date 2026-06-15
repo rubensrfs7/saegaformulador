@@ -141,7 +141,7 @@ export default function Volumoso({ data, updateData }: Props) {
         {/* Goals Display */}
         <div className="mb-8 flex flex-col sm:flex-row gap-4">
           <div className="p-6 rounded-2xl bg-[#ecfdf3] shadow-sm border border-green-100 flex-1 sm:flex-none sm:min-w-[300px]">
-             <div className="text-xs font-bold text-green-700 mb-2">META VOLUMOSO ({currentTarget?.volumosoPercent || 65}%)</div>
+             <div className="text-xs font-bold text-green-700 mb-2">VOLUMOSO ({currentTarget?.volumosoPercent || 65}%)</div>
              <div className="text-3xl font-black text-green-700 mb-2">
                {displayMetaVolumoso.toFixed(2).replace(/\.00$/, '')} <span className="text-sm font-semibold">{unitVolumoso}</span>
              </div>

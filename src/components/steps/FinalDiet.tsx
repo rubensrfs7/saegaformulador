@@ -1,5 +1,6 @@
 import { FormulationState } from '../../types';
 import { MOCK_INGREDIENTS, CONSUMPTION_TARGETS } from '../../data';
+import { ArrowUp, ArrowDown } from 'lucide-react';
 
 interface Props {
   data: FormulationState;
@@ -89,13 +90,36 @@ export default function FinalDiet({ data }: Props) {
 
 
   const nutrientCards = [
-    { label: 'PB', value: totalMS > 0 ? totalPB / totalMS : 0 },
-    { label: 'NDT', value: totalMS > 0 ? totalNDT / totalMS : 0 },
-    { label: 'FDN', value: totalMS > 0 ? totalFDN / totalMS : 0 },
-    { label: 'AMIDO', value: totalMS > 0 ? totalAmido / totalMS : 0 },
-    { label: 'CÁLCIO', value: totalMS > 0 ? totalCalcio / totalMS : 0 },
-    { label: 'FÓSFORO', value: totalMS > 0 ? totalFosforo / totalMS : 0 },
+    { label: 'PB', value: totalMS > 0 ? totalPB / totalMS : 0, target: currentTarget?.pbTmr || 0 },
+    { label: 'NDT', value: totalMS > 0 ? totalNDT / totalMS : 0, target: currentTarget?.ndtTmr || 0 },
+    { label: 'FDN', value: totalMS > 0 ? totalFDN / totalMS : 0, target: currentTarget?.fdnTmr || 0 },
+    { label: 'AMIDO', value: totalMS > 0 ? totalAmido / totalMS : 0, target: (currentTarget?.amidoPercent || 0) * 10 },
+    { label: 'CÁLCIO', value: totalMS > 0 ? totalCalcio / totalMS : 0, target: 0 },
+    { label: 'FÓSFORO', value: totalMS > 0 ? totalFosforo / totalMS : 0, target: 0 },
   ];
+
+  const renderIndicator = (value: number, target: number, label: string) => {
+    if (!target) return null;
+    
+    // For FDN, typically we want to be close but often it's seen as a minimum or maximum depending on the diet
+    // But common use case is "hitting the target".
+    // I'll show ArrowUp if value < target (needs more) and ArrowDown if value > target (too much?)
+    // But usually nutrient targets are "minimum requirements".
+    // Let's stick to simple: value < target -> ArrowUp (Increase needed), value > target + buffer -> ArrowDown (Optional/Too much)
+    
+    const diff = value - target;
+    const threshold = target * 0.02; // 2% tolerance
+
+    if (Math.abs(diff) < threshold) {
+      return null; // On target
+    }
+
+    if (diff < 0) {
+      return <ArrowUp size={14} className="text-red-500 animate-pulse" />;
+    } else {
+      return <ArrowDown size={14} className="text-blue-500" />;
+    }
+  };
 
   return (
     <>
@@ -103,7 +127,7 @@ export default function FinalDiet({ data }: Props) {
         <div className="p-8 flex-1">
           <div className="flex justify-between items-start mb-8">
             <div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-1">Dieta Final</h2>
+              <h2 className="text-2xl font-bold text-gray-800 mb-1">Dieta Final por Animal</h2>
               <p className="text-gray-500">Resumo da dieta combinando concentrado e volumoso</p>
             </div>
           </div>
@@ -158,16 +182,26 @@ export default function FinalDiet({ data }: Props) {
 
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mt-8">
             {nutrientCards.map((card, i) => (
-              <div key={i} className="border border-gray-100 rounded-xl p-4 shadow-sm bg-[#fafafa]">
-                <div className="text-[10px] font-bold text-gray-500 mb-1">{card.label}</div>
+              <div key={i} className="border border-gray-100 rounded-xl p-4 shadow-sm bg-[#fafafa] relative overflow-hidden">
+                <div className="text-[10px] font-bold text-gray-500 mb-1 flex justify-between items-center">
+                  {card.label}
+                  {renderIndicator(card.value, card.target, card.label)}
+                </div>
                 <div className="flex items-baseline gap-1">
                   <div className={`text-xl font-bold ${getNutrientColor(card.label, card.value)}`}>
                     {card.value.toFixed(2).replace(/\.00$/, '')}
                   </div>
                   <div className="text-xs font-medium text-gray-500">g/kg</div>
                 </div>
-                <div className={`text-xs font-semibold mt-1 ${getNutrientColor(card.label, card.value)}`}>
-                  {(card.value / 10).toFixed(2).replace(/\.00$/, '')}%
+                <div className={`flex justify-between items-center mt-1`}>
+                  <div className={`text-xs font-semibold ${getNutrientColor(card.label, card.value)}`}>
+                    {(card.value / 10).toFixed(2).replace(/\.00$/, '')}%
+                  </div>
+                  {card.target > 0 && (
+                    <div className="text-[9px] text-gray-400 font-bold">
+                      Meta: {(card.target / 10).toFixed(0)}%
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
