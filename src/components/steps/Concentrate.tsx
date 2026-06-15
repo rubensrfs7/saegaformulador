@@ -14,7 +14,8 @@ export default function Concentrate({ data, updateData }: Props) {
       id: Math.random().toString(36).substring(7),
       ingredientId: defaultIngredient.id,
       type,
-      mn: ''
+      mn: '',
+      ms: ''
     };
     updateData({ concentrates: [...data.concentrates, newEntry] });
   };
@@ -25,7 +26,21 @@ export default function Concentrate({ data, updateData }: Props) {
 
   const updateEntry = (id: string, field: keyof IngredientEntry, value: any) => {
     updateData({
-      concentrates: data.concentrates.map(c => c.id === id ? { ...c, [field]: value } : c)
+      concentrates: data.concentrates.map(c => {
+        if (c.id !== id) return c;
+        const itemInfo = MOCK_INGREDIENTS.find(i => i.id === (field === 'ingredientId' ? value : c.ingredientId));
+        if (!itemInfo) return { ...c, [field]: value };
+        
+        let updated = { ...c, [field]: value };
+        if (field === 'mn') {
+          const mn = value === '' ? 0 : Number(value);
+          updated.ms = mn * (itemInfo.msPercent / 100);
+        } else if (field === 'ingredientId') {
+          const mn = Number(c.mn) || 0;
+          updated.ms = mn * (itemInfo.msPercent / 100);
+        }
+        return updated;
+      })
     });
   };
 
@@ -50,8 +65,9 @@ export default function Concentrate({ data, updateData }: Props) {
     const itemInfo = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
     if (!itemInfo) return null;
     
-      const mnValue = Number(entry.mn) || 0;
-    const msValue = mnValue && itemInfo.msPercent ? mnValue * (itemInfo.msPercent / 100) : 0;
+    // Use stored ms if available, else calculate from mn
+    const msValue = entry.ms !== '' && entry.ms !== undefined ? Number(entry.ms) : (Number(entry.mn) || 0) * (itemInfo.msPercent / 100);
+    const mnValue = Number(entry.mn) || 0;
     
     totalMS += msValue;
     totalMN += mnValue;

@@ -19,15 +19,17 @@ export default function Report({ data }: Props) {
   const days = Number(data.days) || 1;
 
   const currentConcentrateMS = data.concentrates.reduce((sum, entry) => {
-    const mn = Number(entry.mn) || 0;
     const info = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
-    return sum + (mn && info?.msPercent ? mn * (info.msPercent / 100) : 0);
+    if (!info) return sum;
+    const ms = entry.ms !== '' && entry.ms !== undefined ? Number(entry.ms) : (Number(entry.mn) || 0) * (info.msPercent / 100);
+    return sum + ms;
   }, 0);
   
   const currentVolumosoMS = data.volumosos.reduce((sum, entry) => {
-    const mn = Number(entry.mn) || 0;
     const info = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
-    return sum + (mn && info?.msPercent ? mn * (info.msPercent / 100) : 0);
+    if (!info) return sum;
+    const ms = entry.ms !== '' && entry.ms !== undefined ? Number(entry.ms) : (Number(entry.mn) || 0) * (info.msPercent / 100);
+    return sum + ms;
   }, 0);
 
   const resolveEntries = (entries: any[], currentGroupMS: number, metaGroupMS: number) => {
@@ -36,7 +38,7 @@ export default function Report({ data }: Props) {
       const itemInfo = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
       if (!itemInfo) return null;
       
-      const originalMS = (Number(entry.mn) || 0) * (itemInfo.msPercent / 100);
+      const originalMS = entry.ms !== '' && entry.ms !== undefined ? Number(entry.ms) : (Number(entry.mn) || 0) * (itemInfo.msPercent / 100);
       const proportion = currentGroupMS > 0 ? originalMS / currentGroupMS : 0;
       
       const scaledMSpA = proportion * metaGroupMS;

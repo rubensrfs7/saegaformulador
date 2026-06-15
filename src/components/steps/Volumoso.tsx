@@ -150,21 +150,29 @@ export default function Volumoso({ data, updateData }: Props) {
              )}
           </div>
           {totalMS > 0 && (
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-4">
               <div className="p-4 rounded-xl bg-[#ecfdf3]/50 border border-green-100 flex flex-col justify-center sm:min-w-[150px]">
                 <div className="text-[10px] items-center font-bold text-green-600/80 mb-1 uppercase">Total em MS</div>
                 <div className="text-xl font-bold text-green-700">
                   {totalMS.toFixed(2)} <span className="text-xs font-semibold">kg</span>
                 </div>
               </div>
+
+              <div className="p-4 rounded-xl bg-[#ecfdf3]/50 border border-green-100 flex flex-col justify-center sm:min-w-[150px]">
+                <div className="text-[10px] items-center font-bold text-green-600/80 mb-1 uppercase">Meta em MS</div>
+                <div className="text-xl font-bold text-green-700">
+                  {metaVolumoso.toFixed(2)} <span className="text-xs font-semibold">kg</span>
+                </div>
+              </div>
+
               <div className={`p-4 rounded-xl border flex flex-col justify-center sm:min-w-[150px] ${
                 Math.abs(metaVolumoso - totalMS) < 0.1 ? 'bg-blue-50 border-blue-100' : 'bg-orange-50 border-orange-100'
               }`}>
                 <div className="text-[10px] items-center font-bold text-gray-500 mb-1 uppercase">
-                  {totalMS > metaVolumoso ? 'Excesso MS' : 'Falta MS'}
+                  {totalMS > metaVolumoso ? 'Excesso MN' : 'Falta MN'}
                 </div>
                 <div className={`text-xl font-bold ${totalMS > metaVolumoso ? 'text-red-500' : 'text-orange-600'}`}>
-                  {Math.abs(metaVolumoso - totalMS).toFixed(2)} <span className="text-xs font-semibold">kg</span>
+                  {Math.abs(displayMetaVolumoso - totalMN).toFixed(2)} <span className="text-xs font-semibold">kg</span>
                 </div>
               </div>
             </div>
