@@ -34,19 +34,27 @@ export default function FinalDiet({ data }: Props) {
   let totalCalcio = 0;
   let totalFosforo = 0;
   
+  let totalScaledConcentrateMN = 0;
+
   const resolvedDiet = [
     ...data.concentrates.map(entry => {
       const itemInfo = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
       if (!itemInfo) return null;
-      const mnValue = Number(entry.mn) || 0;
-      const msValue = entry.ms !== '' ? Number(entry.ms) : mnValue * (itemInfo.msPercent / 100);
-      return { ...entry, itemInfo, msValue, mnValue };
+      
+      const originalMS = entry.ms !== '' && entry.ms !== undefined ? Number(entry.ms) : (Number(entry.mn) || 0) * (itemInfo.msPercent / 100);
+      const proportion = currentConcentrateMS > 0 ? originalMS / currentConcentrateMS : 0;
+      
+      const scaledMS = proportion * metaConcentrado;
+      const scaledMN = itemInfo.msPercent ? scaledMS / (itemInfo.msPercent / 100) : 0;
+      
+      totalScaledConcentrateMN += scaledMN;
+      return { ...entry, itemInfo, msValue: scaledMS, mnValue: scaledMN };
     }),
     ...data.volumosos.map(entry => {
       const itemInfo = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
       if (!itemInfo) return null;
       const mnValue = Number(entry.mn) || 0;
-      const msValue = entry.ms !== '' ? Number(entry.ms) : mnValue * (itemInfo.msPercent / 100);
+      const msValue = entry.ms !== '' && entry.ms !== undefined ? Number(entry.ms) : mnValue * (itemInfo.msPercent / 100);
       return { ...entry, itemInfo, msValue, mnValue };
     })
   ].filter(Boolean) as { ingredientId: string, mn: string, itemInfo: typeof MOCK_INGREDIENTS[0], msValue: number, mnValue: number }[];
@@ -208,7 +216,7 @@ export default function FinalDiet({ data }: Props) {
                <div>
                   <div className="text-[10px] font-bold text-orange-600 tracking-wider uppercase mb-1">Concentrado</div>
                   <div className="text-2xl font-black text-orange-600">
-                    {data.concentrates.reduce((sum, c) => sum + (Number(c.mn) || 0), 0).toFixed(2).replace(/\.00$/, '')} <span className="text-sm font-bold">Kg MN</span>
+                    {totalScaledConcentrateMN.toFixed(2).replace(/\.00$/, '')} <span className="text-sm font-bold">Kg MN</span>
                   </div>
                </div>
                <div>

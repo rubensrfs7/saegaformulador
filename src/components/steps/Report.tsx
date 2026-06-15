@@ -47,13 +47,33 @@ export default function Report({ data }: Props) {
     return { resolved, totalMS };
   }
 
-  const conc = resolveRawEntries(data.concentrates);
+  const resolveScaledEntries = (entries: any[], currentMS: number, metaMS: number) => {
+    let totalMS = 0;
+    const resolved = entries.map(entry => {
+      const itemInfo = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
+      if (!itemInfo) return null;
+      
+      const originalMS = entry.ms !== '' && entry.ms !== undefined ? Number(entry.ms) : (Number(entry.mn) || 0) * (itemInfo.msPercent / 100);
+      const proportion = currentMS > 0 ? originalMS / currentMS : 0;
+      
+      const scaledMS = proportion * metaMS;
+      const scaledMN = itemInfo.msPercent ? scaledMS / (itemInfo.msPercent / 100) : 0;
+      
+      totalMS += scaledMS;
+      return { ...entry, itemInfo, msValue: scaledMS, mnValue: scaledMN };
+    }).filter(Boolean) as any[];
+    return { resolved, totalMS };
+  }
+
+  const rawConc = resolveRawEntries(data.concentrates);
+  const scaledConc = resolveScaledEntries(data.concentrates, currentConcentrateMS, metaConcentrado);
   const vol = resolveRawEntries(data.volumosos);
   
-  const allEntries = [...conc.resolved, ...vol.resolved];
-  const globalTotalMS = conc.totalMS + vol.totalMS;
+  const allEntries = [...scaledConc.resolved, ...vol.resolved];
+  const globalTotalMS = scaledConc.totalMS + vol.totalMS;
   const globalTotalMN = allEntries.reduce((s, x) => s + (x?.mnValue || 0), 0);
-  const concTotalMN = conc.resolved.reduce((s, x) => s + (x?.mnValue || 0), 0);
+  const rawConcTotalMN = rawConc.resolved.reduce((s, x) => s + (x?.mnValue || 0), 0);
+  const scaledConcTotalMN = scaledConc.resolved.reduce((s, x) => s + (x?.mnValue || 0), 0);
   const volTotalMN = vol.resolved.reduce((s, x) => s + (x?.mnValue || 0), 0);
 
   let totalPB = 0, totalNDT = 0, totalFDN = 0, totalAmido = 0;
@@ -69,21 +89,11 @@ export default function Report({ data }: Props) {
     totalFosforo += c.msValue * (c.itemInfo?.fosforo || 0);
   });
 
-  const getNutrientColor = (nutrient: string, value: number) => {
-    if (!currentTarget) return 'text-gray-800';
-    if (nutrient === 'PB' && currentTarget.pbTmr) {
-      return value >= currentTarget.pbTmr ? 'text-green-600' : 'text-red-500';
-    }
-    if (nutrient === 'NDT' && currentTarget.ndtTmr) {
-      return value >= currentTarget.ndtTmr ? 'text-green-600' : 'text-red-500';
-    }
-    if (nutrient === 'FDN' && currentTarget.fdnTmr) {
-      return value <= currentTarget.fdnTmr ? 'text-green-600' : 'text-red-500'; 
-    }
-    if (nutrient === 'AMIDO' && currentTarget.amidoPercent) {
-      return value <= (currentTarget.amidoPercent * 10) ? 'text-green-600' : 'text-red-500'; 
-    }
-    return 'text-gray-800';
+  const getNutrientColor = (value: number, target: number) => {
+    if (!target) return 'text-gray-800';
+    if (value < target * 0.90) return 'text-red-500';
+    if (value < target * 0.98) return 'text-yellow-600';
+    return 'text-green-600';
   };
 
   const nutrientCards = [
@@ -116,306 +126,334 @@ export default function Report({ data }: Props) {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-md border border-gray-100 p-12 print:shadow-none print:border-none">
-        
-        {/* Header */}
-        <div className="flex justify-between items-end border-b-4 border-blue-600 pb-4 mb-8">
-          <img src="https://preview.saega.com.br/version_2_final/assets/logotipo-so-CgB1U75J.png" alt="Saega" className="h-10" referrerPolicy="no-referrer" />
-          <div className="text-sm font-bold text-gray-400">DATA: {new Date().toLocaleDateString('pt-BR')}</div>
-        </div>
+      <div className="flex flex-col gap-8 print:gap-0 w-full max-w-[210mm] mx-auto">
+        <style dangerouslySetInnerHTML={{ __html: `
+          @media print {
+            body { background: white !important; }
+            .max-w-4xl { max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
+            .print\\:shadow-none { box-shadow: none !important; }
+            .print\\:border-none { border: none !important; }
+            .print-page { 
+              padding: 0 !important; 
+              margin: 0 !important; 
+              box-shadow: none !important; 
+              border: none !important;
+              page-break-after: always;
+              min-height: 297mm;
+            }
+            .print-page:last-child {
+              page-break-after: auto;
+            }
+            @page {
+              size: A4;
+              margin: 15mm;
+            }
+          }
+        ` }} />
 
-        <div className="text-center mb-12">
-          <h1 className="text-sm font-bold text-gray-400 tracking-widest uppercase mb-2">Relatório Nutricional</h1>
-          <h2 className="text-2xl font-black text-blue-700 uppercase">{data.name || 'Fórmula Sem Nome'}</h2>
-        </div>
-
-        <section className="mb-10">
-          <h3 className="text-xs font-bold text-blue-700 tracking-wider mb-4">1. PERFIL DO ANIMAL</h3>
-          <div className="bg-gray-50 rounded-xl p-5 flex flex-wrap gap-8">
-            <div>
-              <div className="text-[10px] font-bold text-gray-400 mb-1">CATEGORIA</div>
-              <div className="text-sm font-bold text-gray-800">{data.category || '-'}</div>
-            </div>
-            <div>
-              <div className="text-[10px] font-bold text-gray-400 mb-1">SUBCATEGORIA</div>
-              <div className="text-sm font-bold text-gray-800">{data.subcategory || '-'}</div>
-            </div>
-            <div>
-              <div className="text-[10px] font-bold text-gray-400 mb-1">PESO</div>
-              <div className="text-sm font-bold text-gray-800">{data.weight || '-'} kg</div>
-            </div>
-            <div>
-              <div className="text-[10px] font-bold text-gray-400 mb-1">QUANT. ANIMAIS</div>
-              <div className="text-sm font-bold text-gray-800">{data.quantity || '1'}</div>
-            </div>
-            <div>
-              <div className="text-[10px] font-bold text-gray-400 mb-1">PERÍODO (DIAS)</div>
-              <div className="text-sm font-bold text-gray-800">{data.days || '1'} dias</div>
-            </div>
-          </div>
-        </section>
-
-        <section className="mb-10">
-          <h3 className="text-xs font-bold text-blue-700 tracking-wider mb-4">2. METAS DE CONSUMO</h3>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-gray-50 rounded-xl p-5">
-              <div className="text-[10px] font-bold text-gray-400 mb-3">META DE CMS</div>
-              <div className="text-xl font-black text-gray-800">{metaCMS.toFixed(2).replace(/\.00$/, '')} kg/dia</div>
-            </div>
-            <div className="bg-[#fffcf8] border border-orange-100 rounded-xl p-5">
-              <div className="text-[10px] font-bold text-orange-600 mb-3">META DE CONCENTRADO</div>
-              <div className="text-xl font-black text-gray-800 mb-1">{metaConcentrado.toFixed(2).replace(/\.00$/, '')} kg MS</div>
-              <div className="text-xs font-bold text-orange-500">{currentTarget?.concentradoPercent || 35}%</div>
-            </div>
-            <div className="bg-[#f0fdf4] border border-green-100 rounded-xl p-5">
-              <div className="text-[10px] font-bold text-green-700 mb-3">VOLUMOSO</div>
-              <div className="text-xl font-black text-gray-800 mb-1">{metaVolumoso.toFixed(2).replace(/\.00$/, '')} kg MS</div>
-              <div className="text-xs font-bold text-green-600">{currentTarget?.volumosoPercent || 65}%</div>
-            </div>
-          </div>
-        </section>
-
-        <section className="mb-10">
-          <h3 className="text-xs font-bold text-blue-700 tracking-wider mb-4">3. FÓRMULA DO CONCENTRADO</h3>
-          <div className="border border-gray-200 rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left font-bold text-gray-400 text-[10px] uppercase p-4">Insumo</th>
-                  <th className="text-right font-bold text-gray-400 text-[10px] uppercase p-4">Quantidade</th>
-                  <th className="text-right font-bold text-gray-400 text-[10px] uppercase p-4">% Mistura</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {conc.resolved.map((item, idx) => (
-                  <tr key={idx} className="bg-white">
-                    <td className="p-4 text-gray-700 font-medium">{item?.itemInfo?.name}</td>
-                    <td className="p-4 text-right font-bold">{item?.mnValue.toFixed(2).replace(/\.00$/, '')} kg</td>
-                    <td className="p-4 text-right text-gray-500">
-                      {concTotalMN > 0 ? ((item!.mnValue / concTotalMN) * 100).toFixed(1) : 0}%
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-[#fff8eb] border-t border-orange-100">
-                <tr>
-                  <td colSpan={3} className="p-4">
-                    <div className="flex justify-between items-center text-orange-700">
-                      <div className="font-bold text-xs">TOTAL CONCENTRADO</div>
-                      <div className="flex gap-12 font-black">
-                        <div>{concTotalMN.toFixed(2).replace(/\.00$/, '')} kg MN</div>
-                        <div>100%</div>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </section>
-
-        <section className="mb-10">
-          <h3 className="text-xs font-bold text-blue-700 tracking-wider mb-4">4. VOLUMOSO</h3>
-          <div className="border border-gray-200 rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left font-bold text-gray-400 text-[10px] uppercase p-4">Insumo</th>
-                  <th className="text-right font-bold text-gray-400 text-[10px] uppercase p-4">Quantidade</th>
-                  <th className="text-right font-bold text-gray-400 text-[10px] uppercase p-4">% Mistura</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {vol.resolved.map((item, idx) => (
-                  <tr key={idx} className="bg-white">
-                    <td className="p-4 text-gray-700 font-medium">{item?.itemInfo?.name}</td>
-                    <td className="p-4 text-right font-bold">{item?.mnValue.toFixed(2).replace(/\.00$/, '')} kg</td>
-                    <td className="p-4 text-right text-gray-500">
-                      {volTotalMN > 0 ? ((item!.mnValue / volTotalMN) * 100).toFixed(1) : 0}%
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-[#f0fdf4] border-t border-green-100">
-                <tr>
-                  <td colSpan={3} className="p-4">
-                    <div className="flex justify-between items-center text-green-700">
-                      <div className="font-bold text-xs uppercase">Total Volumoso</div>
-                      <div className="flex gap-12 font-black text-right pr-4">
-                        <div>{volTotalMN.toFixed(2).replace(/\.00$/, '')} kg MN</div>
-                        <div>100%</div>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </section>
-
-        <section className="mb-12">
-          <h3 className="text-xs font-bold text-blue-700 tracking-wider mb-4">5. DIETA FINAL POR ANIMAL</h3>
-          
-          <div className="mb-6 border border-gray-200 rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="py-4 px-6 text-left font-bold text-gray-400 text-[10px] uppercase hidden sm:table-cell">Categoria</th>
-                  <th className="py-4 px-4 text-left font-bold text-gray-400 text-[10px] uppercase">Insumo</th>
-                  <th className="py-4 px-4 text-right font-bold text-gray-400 text-[10px] uppercase">MN (kg)</th>
-                  <th className="py-4 px-4 text-right font-bold text-gray-400 text-[10px] uppercase">MS (kg)</th>
-                  <th className="py-4 px-6 text-right font-bold text-gray-400 text-[10px] uppercase">% MS</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {allEntries.map((item, idx) => (
-                  <tr key={idx} className="bg-white">
-                    <td className="py-4 px-6 w-40 hidden sm:table-cell">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-                        item?.itemInfo?.type === 'Concentrado' ? 'bg-orange-50 text-orange-600 border-orange-200' : 
-                        item?.itemInfo?.type === 'Mineral' ? 'bg-slate-50 text-slate-600 border-slate-200' :
-                        item?.itemInfo?.type === 'Volumoso' ? 'bg-green-50 text-green-600 border-green-200' :
-                        'bg-gray-50 text-gray-600 border-gray-200'
-                      }`}>
-                        {item?.itemInfo?.type}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 text-left text-gray-700 font-bold">{item?.itemInfo?.name}</td>
-                    <td className="py-4 px-4 text-right font-medium">{item?.mnValue.toFixed(2).replace(/\.00$/, '')}</td>
-                    <td className="py-4 px-4 text-right font-medium">{item?.msValue.toFixed(2).replace(/\.00$/, '')}</td>
-                    <td className="py-4 px-6 text-right text-gray-500 font-semibold">
-                      {globalTotalMS > 0 ? ((item!.msValue / globalTotalMS) * 100).toFixed(1) : 0}%
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {/* Page 1 */}
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-12 print:shadow-none print:border-none print:p-0 print:m-0 w-full print-page overflow-hidden">
+          {/* Header */}
+          <div className="flex justify-between items-end border-b-4 border-blue-600 pb-4 mb-8">
+            <img src="https://preview.saega.com.br/version_2_final/assets/logotipo-so-CgB1U75J.png" alt="Saega" className="h-10" referrerPolicy="no-referrer" />
+            <div className="text-sm font-bold text-gray-400">DATA: {new Date().toLocaleDateString('pt-BR')}</div>
           </div>
 
-          <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
-            {/* Nutritional Cards */}
-            <div className="p-6 bg-white border-b border-gray-100">
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-                {nutrientCards.map((card, i) => (
-                  <div key={i} className="border border-gray-100 bg-gray-50 rounded-xl p-4 flex flex-col justify-center">
-                    <div className="text-[10px] font-bold text-gray-500 mb-1 flex justify-between items-center whitespace-nowrap">
-                      {card.label}
-                      {renderIndicator(card.value, card.target)}
-                    </div>
-                    <div className={`text-xl font-bold flex items-baseline gap-1 ${getNutrientColor(card.label, card.value)}`}>
-                      {card.value.toFixed(2).replace(/\.00$/, '')}
-                      <span className="text-[10px] font-medium text-gray-400">g/kg</span>
-                    </div>
-                    <div className={`flex justify-between items-center mt-1`}>
-                      <div className={`text-[10px] font-bold ${getNutrientColor(card.label, card.value)}`}>
-                        {(card.value / 10).toFixed(2).replace(/\.00$/, '')}%
-                      </div>
-                      {card.target > 0 && (
-                        <div className="text-[8px] text-gray-400 font-bold whitespace-nowrap">
-                          M: {(card.target / 10).toFixed(0)}%
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
+          <div className="text-center mb-12">
+            <h1 className="text-sm font-bold text-gray-400 tracking-widest uppercase mb-2">Relatório Nutricional</h1>
+            <h2 className="text-2xl font-black text-blue-700 uppercase">{data.name || 'Fórmula Sem Nome'}</h2>
+          </div>
+
+          <section className="mb-10 break-inside-avoid">
+            <h3 className="text-xs font-bold text-blue-700 tracking-wider mb-4">1. PERFIL DO ANIMAL</h3>
+            <div className="bg-gray-50 rounded-xl p-5 flex flex-wrap gap-8">
+              <div>
+                <div className="text-[10px] font-bold text-gray-400 mb-1">CATEGORIA</div>
+                <div className="text-sm font-bold text-gray-800">{data.category || '-'}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-bold text-gray-400 mb-1">SUBCATEGORIA</div>
+                <div className="text-sm font-bold text-gray-800">{data.subcategory || '-'}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-bold text-gray-400 mb-1">PESO</div>
+                <div className="text-sm font-bold text-gray-800">{data.weight || '-'} kg</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-bold text-gray-400 mb-1">QUANT. ANIMAIS</div>
+                <div className="text-sm font-bold text-gray-800">{data.quantity || '1'}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-bold text-gray-400 mb-1">PERÍODO (DIAS)</div>
+                <div className="text-sm font-bold text-gray-800">{data.days || '1'} dias</div>
               </div>
             </div>
+          </section>
 
-            {/* Footer */}
-            <div className="bg-[#f4f7fb] p-6 flex flex-col md:flex-row justify-between items-center gap-6">
-              <div className="flex flex-col md:flex-row gap-4 sm:gap-8 items-start md:items-center w-full">
-                <div>
-                  <div className="text-[10px] font-bold text-blue-800 mb-1 tracking-wider uppercase">Total MN da Dieta (1 Animal)</div>
-                  <div className="text-3xl font-black text-blue-900">{globalTotalMN.toFixed(2).replace(/\.00$/, '')} <span className="text-sm font-semibold">Kg</span></div>
-                </div>
-                
-                <div className="hidden md:block h-10 w-px bg-blue-200"></div>
-
-                <div className="flex gap-6">
-                   <div>
-                      <div className="text-[10px] font-bold text-orange-600 tracking-wider uppercase mb-1">Concentrado ({currentTarget?.concentradoPercent || 35}%)</div>
-                      <div className="text-xl font-black text-orange-600">
-                        {concTotalMN.toFixed(2).replace(/\.00$/, '')} <span className="text-xs font-bold">Kg MN</span>
-                      </div>
-                   </div>
-                   <div>
-                      <div className="text-[10px] font-bold text-green-700 tracking-wider uppercase mb-1">Volumoso ({currentTarget?.volumosoPercent || 65}%)</div>
-                      <div className="text-xl font-black text-green-700">
-                        {volTotalMN.toFixed(2).replace(/\.00$/, '')} <span className="text-xs font-bold">Kg MN</span>
-                      </div>
-                   </div>
-                </div>
+          <section className="mb-10 break-inside-avoid">
+            <h3 className="text-xs font-bold text-blue-700 tracking-wider mb-4">2. METAS DE CONSUMO</h3>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-gray-50 rounded-xl p-5">
+                <div className="text-[10px] font-bold text-gray-400 mb-3">META DE CMS</div>
+                <div className="text-xl font-black text-gray-800">{metaCMS.toFixed(2).replace(/\.00$/, '')} kg/dia</div>
               </div>
-              
-              <div className="text-left md:text-right shrink-0 w-full md:w-auto border-t border-blue-200 pt-4 md:border-t-0 md:pt-0">
-                <div className="text-[10px] font-bold text-blue-600 mb-1 uppercase tracking-wider">Total MS da Dieta (1 Animal)</div>
-                <div className="text-2xl font-bold text-blue-800">{globalTotalMS.toFixed(2).replace(/\.00$/, '')} <span className="text-sm font-medium">Kg</span></div>
+              <div className="bg-[#fffcf8] border border-orange-100 rounded-xl p-5">
+                <div className="text-[10px] font-bold text-orange-600 mb-3">META DE CONCENTRADO</div>
+                <div className="text-xl font-black text-gray-800 mb-1">{metaConcentrado.toFixed(2).replace(/\.00$/, '')} kg MS</div>
+                <div className="text-xs font-bold text-orange-500">{currentTarget?.concentradoPercent || 35}%</div>
+              </div>
+              <div className="bg-[#f0fdf4] border border-green-100 rounded-xl p-5">
+                <div className="text-[10px] font-bold text-green-700 mb-3">VOLUMOSO</div>
+                <div className="text-xl font-black text-gray-800 mb-1">{metaVolumoso.toFixed(2).replace(/\.00$/, '')} kg MS</div>
+                <div className="text-xs font-bold text-green-600">{currentTarget?.volumosoPercent || 65}%</div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        {animais > 1 && (
-          <section className="mb-12 print:break-before-page">
-            <h3 className="text-xs font-bold text-blue-700 tracking-wider mb-4">6. MISTURA DO LOTE ({animais} ANIMAIS)</h3>
-            <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+          <section className="mb-10 break-inside-avoid">
+            <h3 className="text-xs font-bold text-blue-700 tracking-wider mb-4">3. FÓRMULA DO CONCENTRADO</h3>
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-100">
-                  <tr>
-                    <th className="py-4 px-6 text-left font-bold text-gray-400 text-[10px] uppercase">Insumo</th>
-                    <th className="py-4 px-6 text-right font-bold text-gray-400 text-[10px] uppercase">Mistura Diária (kg)</th>
-                    <th className="py-4 px-6 text-right font-bold text-gray-400 text-[10px] uppercase">Mistura Total ({days} dias)</th>
-                    <th className="py-4 px-6 text-right font-bold text-gray-400 text-[10px] uppercase">Total MS (kg)</th>
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-left font-bold text-gray-400 text-[10px] uppercase p-4">Insumo</th>
+                    <th className="text-right font-bold text-gray-400 text-[10px] uppercase p-4">Quantidade</th>
+                    <th className="text-right font-bold text-gray-400 text-[10px] uppercase p-4">% Mistura</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {concTotalMN > 0 && (
-                    <tr className="bg-white">
-                      <td className="py-4 px-6 font-bold text-gray-700 flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase border bg-orange-50 text-orange-600 border-orange-200">C</span>
-                        Total Concentrado
+                  {rawConc.resolved.map((item, idx) => (
+                    <tr key={idx} className="bg-white">
+                      <td className="p-4 text-gray-700 font-medium">{item?.itemInfo?.name}</td>
+                      <td className="p-4 text-right font-bold">{item?.mnValue.toFixed(2).replace(/\.00$/, '')} kg</td>
+                      <td className="p-4 text-right text-gray-500">
+                        {rawConcTotalMN > 0 ? ((item!.mnValue / rawConcTotalMN) * 100).toFixed(1) : 0}%
                       </td>
-                      <td className="py-4 px-6 text-right font-bold text-blue-600">{(concTotalMN * animais).toFixed(2).replace(/\.00$/, '')} kg</td>
-                      <td className="py-4 px-6 text-right font-bold text-blue-700">{(concTotalMN * animais * days).toFixed(2).replace(/\.00$/, '')} kg</td>
-                      <td className="py-4 px-6 text-right text-gray-500 font-medium">{(conc.totalMS * animais * days).toFixed(2).replace(/\.00$/, '')} kg</td>
-                    </tr>
-                  )}
-                  {vol.resolved.map((item, idx) => (
-                    <tr key={`vol-${idx}`} className="bg-white">
-                      <td className="py-4 px-6 font-bold text-gray-700 flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase border bg-green-50 text-green-600 border-green-200">V</span>
-                        {item.itemInfo?.name}
-                      </td>
-                      <td className="py-4 px-6 text-right font-bold text-blue-600">{(item.mnValue * animais).toFixed(2).replace(/\.00$/, '')} kg</td>
-                      <td className="py-4 px-6 text-right font-bold text-blue-700">{(item.mnValue * animais * days).toFixed(2).replace(/\.00$/, '')} kg</td>
-                      <td className="py-4 px-6 text-right text-gray-500 font-medium">{(item.msValue * animais * days).toFixed(2).replace(/\.00$/, '')} kg</td>
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="bg-[#f0f9ff] border-t border-blue-200">
+                <tfoot className="bg-[#fff8eb] border-t border-orange-100">
                   <tr>
-                    <td className="py-4 px-6 font-bold text-blue-900 uppercase text-xs">Total Lote (MN)</td>
-                    <td className="py-4 px-6 text-right font-black text-blue-700 text-lg">{(globalTotalMN * animais).toFixed(2).replace(/\.00$/, '')} kg</td>
-                    <td className="py-4 px-6 text-right font-black text-blue-800 text-lg">{(globalTotalMN * animais * days).toFixed(2).replace(/\.00$/, '')} kg</td>
-                    <td className="py-4 px-6 text-right font-black text-gray-700 text-lg">{(globalTotalMS * animais * days).toFixed(2).replace(/\.00$/, '')} kg</td>
+                    <td colSpan={3} className="p-4">
+                      <div className="flex justify-between items-center text-orange-700">
+                        <div className="font-bold text-xs">TOTAL CONCENTRADO</div>
+                        <div className="flex gap-12 font-black">
+                          <div>{rawConcTotalMN.toFixed(2).replace(/\.00$/, '')} kg MN</div>
+                          <div>100%</div>
+                        </div>
+                      </div>
+                    </td>
                   </tr>
                 </tfoot>
               </table>
             </div>
           </section>
-        )}
 
-        <div className="border-t border-gray-100 pt-8 flex justify-between items-end">
-          <div>
-            <div className="text-[10px] font-bold text-gray-400 mb-1 tracking-widest uppercase">Responsável Técnico</div>
-            <div className="text-sm font-bold text-gray-800">Neide Almeida</div>
-            <div className="text-xs font-bold text-gray-400 mt-1">CRMV n° 000000</div>
-          </div>
-          <div className="text-[10px] font-bold text-gray-300 tracking-widest uppercase">
-            GERADO VIA SAEGA
-          </div>
+          <section className="mb-10 break-inside-avoid">
+            <h3 className="text-xs font-bold text-blue-700 tracking-wider mb-4">4. VOLUMOSO</h3>
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-left font-bold text-gray-400 text-[10px] uppercase p-4">Insumo</th>
+                    <th className="text-right font-bold text-gray-400 text-[10px] uppercase p-4">Quantidade</th>
+                    <th className="text-right font-bold text-gray-400 text-[10px] uppercase p-4">% Mistura</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {vol.resolved.map((item, idx) => (
+                    <tr key={idx} className="bg-white">
+                      <td className="p-4 text-gray-700 font-medium">{item?.itemInfo?.name}</td>
+                      <td className="p-4 text-right font-bold">{item?.mnValue.toFixed(2).replace(/\.00$/, '')} kg</td>
+                      <td className="p-4 text-right text-gray-500">
+                        {volTotalMN > 0 ? ((item!.mnValue / volTotalMN) * 100).toFixed(1) : 0}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-[#f0fdf4] border-t border-green-100">
+                  <tr>
+                    <td colSpan={3} className="p-4">
+                      <div className="flex justify-between items-center text-green-700">
+                        <div className="font-bold text-xs uppercase">Total Volumoso</div>
+                        <div className="flex gap-12 font-black text-right pr-4">
+                          <div>{volTotalMN.toFixed(2).replace(/\.00$/, '')} kg MN</div>
+                          <div>100%</div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </section>
         </div>
 
+        {/* Page 2 */}
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-12 print:shadow-none print:border-none print:p-0 print:m-0 w-full print-page overflow-hidden">
+          <section className="mb-12 break-inside-avoid">
+            <h3 className="text-xs font-bold text-blue-700 tracking-wider mb-4">5. DIETA FINAL POR ANIMAL</h3>
+            
+            <div className="mb-6 border border-gray-200 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    <th className="py-4 px-6 text-left font-bold text-gray-400 text-[10px] uppercase hidden sm:table-cell">Categoria</th>
+                    <th className="py-4 px-4 text-left font-bold text-gray-400 text-[10px] uppercase">Insumo</th>
+                    <th className="py-4 px-4 text-right font-bold text-gray-400 text-[10px] uppercase">MN (kg)</th>
+                    <th className="py-4 px-4 text-right font-bold text-gray-400 text-[10px] uppercase">MS (kg)</th>
+                    <th className="py-4 px-6 text-right font-bold text-gray-400 text-[10px] uppercase">% MS</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {allEntries.map((item, idx) => (
+                    <tr key={idx} className="bg-white">
+                      <td className="py-4 px-6 w-40 hidden sm:table-cell">
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                          item?.itemInfo?.type === 'Concentrado' ? 'bg-orange-50 text-orange-600 border-orange-200' : 
+                          item?.itemInfo?.type === 'Mineral' ? 'bg-slate-50 text-slate-600 border-slate-200' :
+                          item?.itemInfo?.type === 'Volumoso' ? 'bg-green-50 text-green-600 border-green-200' :
+                          'bg-gray-50 text-gray-600 border-gray-200'
+                        }`}>
+                          {item?.itemInfo?.type}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-left text-gray-700 font-bold">{item?.itemInfo?.name}</td>
+                      <td className="py-4 px-4 text-right font-medium">{item?.mnValue.toFixed(2).replace(/\.00$/, '')}</td>
+                      <td className="py-4 px-4 text-right font-medium">{item?.msValue.toFixed(2).replace(/\.00$/, '')}</td>
+                      <td className="py-4 px-6 text-right text-gray-500 font-semibold">
+                        {globalTotalMS > 0 ? ((item!.msValue / globalTotalMS) * 100).toFixed(1) : 0}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+              {/* Nutritional Cards */}
+              <div className="p-6 bg-white border-b border-gray-100">
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                  {nutrientCards.map((card, i) => (
+                    <div key={i} className="border border-gray-100 bg-gray-50 rounded-xl p-4 flex flex-col justify-center">
+                      <div className="text-[10px] font-bold text-gray-500 mb-1 flex justify-between items-center whitespace-nowrap">
+                        {card.label}
+                        {renderIndicator(card.value, card.target)}
+                      </div>
+                      <div className={`text-xl font-bold flex items-baseline gap-1 ${getNutrientColor(card.value, card.target)}`}>
+                        {card.value.toFixed(2).replace(/\.00$/, '')}
+                        <span className="text-[10px] font-medium text-gray-400">g/kg</span>
+                      </div>
+                      <div className={`flex justify-between items-center mt-1`}>
+                        <div className={`text-[10px] font-bold ${getNutrientColor(card.value, card.target)}`}>
+                          {(card.value / 10).toFixed(2).replace(/\.00$/, '')}%
+                        </div>
+                        {card.target > 0 && (
+                          <div className="text-[8px] text-gray-400 font-bold whitespace-nowrap">
+                            M: {(card.target / 10).toFixed(0)}%
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Footer Information */}
+              <div className="bg-[#f4f7fb] p-6 flex flex-col md:flex-row justify-between items-center gap-6">
+                <div className="flex flex-col md:flex-row gap-4 sm:gap-8 items-start md:items-center w-full">
+                  <div>
+                    <div className="text-[10px] font-bold text-blue-800 mb-1 tracking-wider uppercase">Total MN da Dieta (1 Animal)</div>
+                    <div className="text-3xl font-black text-blue-900">{globalTotalMN.toFixed(2).replace(/\.00$/, '')} <span className="text-sm font-semibold">Kg</span></div>
+                  </div>
+                  
+                  <div className="hidden md:block h-10 w-px bg-blue-200"></div>
+
+                  <div className="flex gap-6">
+                    <div>
+                      <div className="text-[10px] font-bold text-orange-600 tracking-wider uppercase mb-1">Concentrado ({currentTarget?.concentradoPercent || 35}%)</div>
+                      <div className="text-xl font-black text-orange-600">
+                        {scaledConcTotalMN.toFixed(2).replace(/\.00$/, '')} <span className="text-xs font-bold">Kg MN</span>
+                      </div>
+                    </div>
+                    <div>
+                        <div className="text-[10px] font-bold text-green-700 tracking-wider uppercase mb-1">Volumoso ({currentTarget?.volumosoPercent || 65}%)</div>
+                        <div className="text-xl font-black text-green-700">
+                          {volTotalMN.toFixed(2).replace(/\.00$/, '')} <span className="text-xs font-bold">Kg MN</span>
+                        </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="text-left md:text-right shrink-0 w-full md:w-auto border-t border-blue-200 pt-4 md:border-t-0 md:pt-0">
+                  <div className="text-[10px] font-bold text-blue-600 mb-1 uppercase tracking-wider">Total MS da Dieta (1 Animal)</div>
+                  <div className="text-2xl font-bold text-blue-800">{globalTotalMS.toFixed(2).replace(/\.00$/, '')} <span className="text-sm font-medium">Kg</span></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {animais > 1 && (
+            <section className="mb-12 break-inside-avoid">
+              <h3 className="text-xs font-bold text-blue-700 tracking-wider mb-4">6. MISTURA DO LOTE ({animais} ANIMAIS)</h3>
+              <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-100">
+                    <tr>
+                      <th className="py-4 px-6 text-left font-bold text-gray-400 text-[10px] uppercase">Insumo</th>
+                      <th className="py-4 px-6 text-right font-bold text-gray-400 text-[10px] uppercase">Mistura Diária (kg)</th>
+                      <th className="py-4 px-6 text-right font-bold text-gray-400 text-[10px] uppercase">Mistura Total ({days} dias)</th>
+                      <th className="py-4 px-6 text-right font-bold text-gray-400 text-[10px] uppercase">Total MS (kg)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {scaledConcTotalMN > 0 && (
+                      <tr className="bg-white">
+                        <td className="py-4 px-6 font-bold text-gray-700 flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase border bg-orange-50 text-orange-600 border-orange-200">C</span>
+                          Total Concentrado
+                        </td>
+                        <td className="py-4 px-6 text-right font-bold text-blue-600">{(scaledConcTotalMN * animais).toFixed(2).replace(/\.00$/, '')} kg</td>
+                        <td className="py-4 px-6 text-right font-bold text-blue-700">{(scaledConcTotalMN * animais * days).toFixed(2).replace(/\.00$/, '')} kg</td>
+                        <td className="py-4 px-6 text-right text-gray-500 font-medium">{(scaledConc.totalMS * animais * days).toFixed(2).replace(/\.00$/, '')} kg</td>
+                      </tr>
+                    )}
+                    {vol.resolved.map((item, idx) => (
+                      <tr key={`vol-${idx}`} className="bg-white">
+                        <td className="py-4 px-6 font-bold text-gray-700 flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase border bg-green-50 text-green-600 border-green-200">V</span>
+                          {item.itemInfo?.name}
+                        </td>
+                        <td className="py-4 px-6 text-right font-bold text-blue-600">{(item.mnValue * animais).toFixed(2).replace(/\.00$/, '')} kg</td>
+                        <td className="py-4 px-6 text-right font-bold text-blue-700">{(item.mnValue * animais * days).toFixed(2).replace(/\.00$/, '')} kg</td>
+                        <td className="py-4 px-6 text-right text-gray-500 font-medium">{(item.msValue * animais * days).toFixed(2).replace(/\.00$/, '')} kg</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-[#f0f9ff] border-t border-blue-200">
+                    <tr>
+                      <td className="py-4 px-6 font-bold text-blue-900 uppercase text-xs">Total Lote (MN)</td>
+                      <td className="py-4 px-6 text-right font-black text-blue-700 text-lg">{(globalTotalMN * animais).toFixed(2).replace(/\.00$/, '')} kg</td>
+                      <td className="py-4 px-6 text-right font-black text-blue-800 text-lg">{(globalTotalMN * animais * days).toFixed(2).replace(/\.00$/, '')} kg</td>
+                      <td className="py-4 px-6 text-right font-black text-gray-700 text-lg">{(globalTotalMS * animais * days).toFixed(2).replace(/\.00$/, '')} kg</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </section>
+          )}
+
+          <div className="border-t border-gray-100 pt-8 flex justify-between items-end">
+            <div>
+              <div className="text-[10px] font-bold text-gray-400 mb-1 tracking-widest uppercase">Responsável Técnico</div>
+              <div className="text-sm font-bold text-gray-800">Neide Almeida</div>
+              <div className="text-xs font-bold text-gray-400 mt-1">CRMV n° 000000</div>
+            </div>
+            <div className="text-[10px] font-bold text-gray-300 tracking-widest uppercase">
+              GERADO VIA SAEGA
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
