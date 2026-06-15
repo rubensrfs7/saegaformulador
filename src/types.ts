@@ -20,6 +20,7 @@ export interface FormulationState {
   subcategory: string;
   weight: number | '';
   quantity: number | '';
+  days: number | '';
   concentrates: IngredientEntry[];
   volumosos: IngredientEntry[];
 }
@@ -29,6 +30,7 @@ export interface IngredientEntry {
   ingredientId: string;
   type: string;
   mn: number | ''; // input value
+  ms: number | ''; // dry matter input/calculated value
 }
 
 export interface IngredientDef {

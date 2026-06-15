@@ -16,6 +16,7 @@ export default function Report({ data }: Props) {
   const metaVolumoso = currentTarget ? metaCMS * (currentTarget.volumosoPercent / 100) : metaCMS * 0.65;
 
   const animais = Number(data.quantity) || 1;
+  const days = Number(data.days) || 1;
 
   const currentConcentrateMS = data.concentrates.reduce((sum, entry) => {
     const mn = Number(entry.mn) || 0;
@@ -139,8 +140,12 @@ export default function Report({ data }: Props) {
               <div className="text-sm font-bold text-gray-800">{data.weight || '-'} kg</div>
             </div>
             <div>
-              <div className="text-[10px] font-bold text-gray-400 mb-1">QUANTIDADE DE ANIMAIS</div>
+              <div className="text-[10px] font-bold text-gray-400 mb-1">QUANT. ANIMAIS</div>
               <div className="text-sm font-bold text-gray-800">{data.quantity || '1'}</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold text-gray-400 mb-1">PERÍODO (DIAS)</div>
+              <div className="text-sm font-bold text-gray-800">{data.days || '1'} dias</div>
             </div>
           </div>
         </section>
@@ -327,8 +332,8 @@ export default function Report({ data }: Props) {
         </section>
 
         {animais > 1 && (
-          <section className="mb-12">
-            <h3 className="text-xs font-bold text-blue-700 tracking-wider mb-4">6. MISTURA DO LOTE ({animais} ANIMAIS)</h3>
+          <section className="mb-12 print:break-before-page">
+            <h3 className="text-xs font-bold text-blue-700 tracking-wider mb-4">6. MISTURA DIÁRIA DO LOTE ({animais} ANIMAIS)</h3>
             <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-100">
@@ -358,9 +363,51 @@ export default function Report({ data }: Props) {
                 </tbody>
                 <tfoot className="bg-[#f4f7fb] border-t border-blue-100">
                   <tr>
-                    <td className="py-4 px-6 font-bold text-blue-900 uppercase text-xs">Total Batida do Lote</td>
+                    <td className="py-4 px-6 font-bold text-blue-900 uppercase text-xs">Total Batida Diária</td>
                     <td className="py-4 px-6 text-right font-black text-blue-700 text-xl">{(globalTotalMN * animais).toFixed(2)} <span className="text-xs">kg MN</span></td>
                     <td className="py-4 px-6 text-right font-black text-gray-600 text-xl">{(globalTotalMS * animais).toFixed(2)} <span className="text-xs">kg MS</span></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </section>
+        )}
+
+        {days > 1 && (
+          <section className="mb-12 print:break-before-page">
+            <h3 className="text-xs font-bold text-blue-700 tracking-wider mb-4">7. MISTURA TOTAL DO PERÍODO ({days} DIAS)</h3>
+            <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-100">
+                  <tr>
+                    <th className="py-4 px-6 text-left font-bold text-gray-400 text-[10px] uppercase">Insumo</th>
+                    <th className="py-4 px-6 text-right font-bold text-gray-400 text-[10px] uppercase">MN (kg) Total</th>
+                    <th className="py-4 px-6 text-right font-bold text-gray-400 text-[10px] uppercase">MS (kg) Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {allEntries.map((item, idx) => (
+                    <tr key={idx} className="bg-white">
+                      <td className="py-4 px-6 font-bold text-gray-700 flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
+                          item?.itemInfo?.type === 'Concentrado' ? 'bg-orange-50 text-orange-600 border-orange-200' : 
+                          item?.itemInfo?.type === 'Mineral' ? 'bg-slate-50 text-slate-600 border-slate-200' :
+                          'bg-green-50 text-green-600 border-green-200'
+                        }`}>
+                          {item?.itemInfo?.type === 'Concentrado' ? 'C' : item?.itemInfo?.type === 'Mineral' ? 'M' : 'V'}
+                        </span>
+                        {item?.itemInfo?.name}
+                      </td>
+                      <td className="py-4 px-6 text-right font-bold text-blue-700">{(item!.mnValue * animais * days).toFixed(2)} kg</td>
+                      <td className="py-4 px-6 text-right text-gray-500 font-medium">{(item!.msValue * animais * days).toFixed(2)} kg</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-[#f0f9ff] border-t border-blue-200">
+                  <tr>
+                    <td className="py-4 px-6 font-bold text-blue-900 uppercase text-xs">Total Consumo Período</td>
+                    <td className="py-4 px-6 text-right font-black text-blue-800 text-2xl">{(globalTotalMN * animais * days).toFixed(2)} <span className="text-sm">kg MN</span></td>
+                    <td className="py-4 px-6 text-right font-black text-gray-700 text-2xl">{(globalTotalMS * animais * days).toFixed(2)} <span className="text-sm">kg MS</span></td>
                   </tr>
                 </tfoot>
               </table>

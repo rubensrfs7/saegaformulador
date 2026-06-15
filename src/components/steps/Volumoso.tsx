@@ -11,11 +11,23 @@ export default function Volumoso({ data, updateData }: Props) {
   const addIngredient = (type: string) => {
     const defaultIngredient = MOCK_INGREDIENTS.find(i => i.type === type) || MOCK_INGREDIENTS.find(i => i.type === 'Volumoso');
     if (!defaultIngredient) return;
+
+    // Default MS to fill remaining metaVolumoso
+    const currentMS = data.volumosos.reduce((sum, entry) => {
+      const mn = Number(entry.mn) || 0;
+      const info = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
+      return sum + (mn && info?.msPercent ? mn * (info.msPercent / 100) : 0);
+    }, 0);
+    
+    const remainingMS = Math.max(0, metaVolumoso - currentMS);
+    const defaultMN = defaultIngredient.msPercent ? remainingMS / (defaultIngredient.msPercent / 100) : 0;
+
     const newEntry: IngredientEntry = {
       id: Math.random().toString(36).substring(7),
       ingredientId: defaultIngredient.id,
       type,
-      mn: ''
+      mn: defaultMN || '',
+      ms: remainingMS || ''
     };
     updateData({ volumosos: [...data.volumosos, newEntry] });
   };
@@ -26,7 +38,28 @@ export default function Volumoso({ data, updateData }: Props) {
 
   const updateEntry = (id: string, field: keyof IngredientEntry, value: any) => {
     updateData({
-      volumosos: data.volumosos.map(c => c.id === id ? { ...c, [field]: value } : c)
+      volumosos: data.volumosos.map(c => {
+        if (c.id !== id) return c;
+        
+        const itemInfo = MOCK_INGREDIENTS.find(i => i.id === (field === 'ingredientId' ? value : c.ingredientId));
+        if (!itemInfo) return { ...c, [field]: value };
+
+        let updated = { ...c, [field]: value };
+
+        if (field === 'mn') {
+          const mn = value === '' ? 0 : Number(value);
+          updated.ms = mn * (itemInfo.msPercent / 100);
+        } else if (field === 'ms') {
+          const ms = value === '' ? 0 : Number(value);
+          updated.mn = itemInfo.msPercent ? ms / (itemInfo.msPercent / 100) : 0;
+        } else if (field === 'ingredientId') {
+          // If ingredient changes, keep MS fixed (cravado) and update MN
+          const ms = Number(c.ms) || 0;
+          updated.mn = itemInfo.msPercent ? ms / (itemInfo.msPercent / 100) : 0;
+        }
+
+        return updated;
+      })
     });
   };
 
@@ -51,8 +84,9 @@ export default function Volumoso({ data, updateData }: Props) {
     const itemInfo = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
     if (!itemInfo) return null;
     
-    const mnValue = Number(entry.mn) || 0;
-    const msValue = mnValue && itemInfo.msPercent ? mnValue * (itemInfo.msPercent / 100) : 0;
+    // In Volumoso, we use the stored mn/ms if they exist, otherwise calculate
+    const msValue = Number(entry.ms || (Number(entry.mn) * (itemInfo.msPercent/100))) || 0;
+    const mnValue = Number(entry.mn || (itemInfo.msPercent ? msValue / (itemInfo.msPercent/100) : 0)) || 0;
     
     totalMS += msValue;
     totalMN += mnValue;
@@ -116,10 +150,22 @@ export default function Volumoso({ data, updateData }: Props) {
              )}
           </div>
           {totalMS > 0 && (
-            <div className="p-4 rounded-xl bg-[#ecfdf3]/50 border border-green-100 flex flex-col justify-center sm:min-w-[150px]">
-              <div className="text-[10px] items-center font-bold text-green-600/80 mb-1 uppercase">Meta em MS</div>
-              <div className="text-xl font-bold text-green-700">
-                {metaVolumoso.toFixed(2).replace(/\.00$/, '')} <span className="text-xs font-semibold">kg</span>
+            <div className="flex gap-4">
+              <div className="p-4 rounded-xl bg-[#ecfdf3]/50 border border-green-100 flex flex-col justify-center sm:min-w-[150px]">
+                <div className="text-[10px] items-center font-bold text-green-600/80 mb-1 uppercase">Total em MS</div>
+                <div className="text-xl font-bold text-green-700">
+                  {totalMS.toFixed(2)} <span className="text-xs font-semibold">kg</span>
+                </div>
+              </div>
+              <div className={`p-4 rounded-xl border flex flex-col justify-center sm:min-w-[150px] ${
+                Math.abs(metaVolumoso - totalMS) < 0.1 ? 'bg-blue-50 border-blue-100' : 'bg-orange-50 border-orange-100'
+              }`}>
+                <div className="text-[10px] items-center font-bold text-gray-500 mb-1 uppercase">
+                  {totalMS > metaVolumoso ? 'Excesso MS' : 'Falta MS'}
+                </div>
+                <div className={`text-xl font-bold ${totalMS > metaVolumoso ? 'text-red-500' : 'text-orange-600'}`}>
+                  {Math.abs(metaVolumoso - totalMS).toFixed(2)} <span className="text-xs font-semibold">kg</span>
+                </div>
               </div>
             </div>
           )}
@@ -130,7 +176,7 @@ export default function Volumoso({ data, updateData }: Props) {
           <div className="col-span-2">Tipo</div>
           <div className="col-span-4">Insumo</div>
           <div className="col-span-2">MN (kg)</div>
-          <div className="col-span-2">MS (kg)</div>
+          <div className="col-span-2">MS (kg) *</div>
           <div className="col-span-1">% da Mistura</div>
           <div className="col-span-1 text-center">Ações</div>
         </div>
@@ -175,8 +221,13 @@ export default function Volumoso({ data, updateData }: Props) {
                       onChange={(e) => updateEntry(entry.id, 'mn', e.target.value ? Number(e.target.value) : '')}
                     />
                   </div>
-                  <div className="col-span-2 text-gray-600 py-2">
-                    {entry.msValue > 0 ? entry.msValue.toFixed(2) : '-'}
+                  <div className="col-span-2">
+                    <input 
+                      type="number" 
+                      className="w-[80%] border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 font-bold"
+                      value={entry.ms}
+                      onChange={(e) => updateEntry(entry.id, 'ms', e.target.value ? Number(e.target.value) : '')}
+                    />
                   </div>
                   <div className="col-span-1 text-gray-600 py-2">
                     {percentage}%

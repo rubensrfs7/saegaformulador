@@ -15,6 +15,7 @@ const INITIAL_STATE: FormulationState = {
   subcategory: '',
   weight: '',
   quantity: 1,
+  days: 1,
   concentrates: [],
   volumosos: []
 }

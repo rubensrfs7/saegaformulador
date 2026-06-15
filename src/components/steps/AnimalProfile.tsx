@@ -1,5 +1,5 @@
 import { FormulationState } from '../../types';
-import { Weight, Users } from 'lucide-react';
+import { Weight, Users, Calendar } from 'lucide-react';
 import { CONSUMPTION_TARGETS } from '../../data';
 
 interface Props {
@@ -69,7 +69,7 @@ export default function AnimalProfile({ data, updateData }: Props) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Peso Vivo (kg)</label>
               <div className="relative">
@@ -86,7 +86,7 @@ export default function AnimalProfile({ data, updateData }: Props) {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Quantidade de Animais</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Quant. Animais</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
                   <Users size={18} />
@@ -96,6 +96,20 @@ export default function AnimalProfile({ data, updateData }: Props) {
                   className="w-full border border-gray-200 rounded-lg pl-11 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
                   value={data.quantity}
                   onChange={(e) => updateData({ quantity: e.target.value ? Number(e.target.value) : '' })}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Quant. Dias</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
+                  <Calendar size={18} />
+                </div>
+                <input 
+                  type="number" 
+                  className="w-full border border-gray-200 rounded-lg pl-11 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
+                  value={data.days}
+                  onChange={(e) => updateData({ days: e.target.value ? Number(e.target.value) : '' })}
                 />
               </div>
             </div>
