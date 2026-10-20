@@ -1,4 +1,4 @@
-export type Step = 1 | 2 | 3 | 4 | 5;
+export type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
 export interface ConsumptionTarget {
   category: string;
@@ -21,16 +21,24 @@ export interface FormulationState {
   weight: number | '';
   quantity: number | '';
   days: number | '';
-  concentrates: IngredientEntry[];
-  volumosos: IngredientEntry[];
+  hasCurrentDiet: boolean; // false if skipped via "Não tenho dieta atual"
+  currentConcentrates: IngredientEntry[];
+  currentVolumosos: IngredientEntry[];
+  currentConcentradoKg?: number | ''; // Fornecimento de concentrado por animal/dia (kg MN)
+  currentVolumosoKg?: number | '';    // Fornecimento de volumoso por animal/dia (kg MN)
+  currentConcentradoPercent?: number | ''; // Proporção % Concentrado (MN)
+  currentVolumosoPercent?: number | '';    // Proporção % Volumoso (MN)
+  adjustedConcentrates: IngredientEntry[];
+  adjustedVolumosos: IngredientEntry[];
+  reportSourceStep?: 3 | 5; // Tracks if report was generated from Step 3 or Step 5
 }
 
 export interface IngredientEntry {
   id: string; // unique for the row
   ingredientId: string;
   type: string;
-  mn: number | ''; // input value
-  ms: number | ''; // dry matter input/calculated value
+  mn: number | ''; // input value (kg Natural Matter)
+  ms: number | ''; // dry matter calculated or input value (kg Dry Matter)
 }
 
 export interface IngredientDef {

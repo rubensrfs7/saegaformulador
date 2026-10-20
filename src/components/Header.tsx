@@ -8,10 +8,9 @@ export default function Header() {
           <ChevronLeft size={20} />
         </button>
         <img 
-          src="https://preview.saega.com.br/version_2_final/assets/logotipo-so-CgB1U75J.png" 
+          src="https://app.saega.com.br/assets/logotipo-so-CgB1U75J.png" 
           alt="Saega" 
           className="h-8" 
-          referrerPolicy="no-referrer" 
         />
         <div className="h-6 w-px bg-gray-200 ml-2"></div>
         <h1 className="text-xl font-bold text-gray-800">Formulador de Dietas</h1>
