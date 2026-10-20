@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, ArrowRight, Info, Scale, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { Plus, Trash2, ArrowRight, Info, Scale, SlidersHorizontal, Sparkles, FlaskConical } from 'lucide-react';
 import { FormulationState, IngredientEntry, IngredientDef } from '../../types';
 import { MOCK_INGREDIENTS, CONSUMPTION_TARGETS } from '../../data';
+import SearchableIngredientSelect from '../common/SearchableIngredientSelect';
 
 interface Props {
   data: FormulationState;
@@ -183,20 +184,12 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
   const volNutrientCards = calcNutrients(resolvedVol, volMS);
 
   // Feeding amounts per animal (kg MN)
-  // If not explicitly defined, default to values or table sums if small
-  const defaultConcKg = data.currentConcentradoKg !== undefined && data.currentConcentradoKg !== '' 
-    ? Number(data.currentConcentradoKg) 
-    : (concMN > 0 && concMN <= 25 ? concMN : 4.0);
+  // Inicia vazio sem nenhum número pré-definido para não gerar confusão
+  const currentConcKg = data.currentConcentradoKg !== undefined ? data.currentConcentradoKg : '';
+  const currentVolKg = data.currentVolumosoKg !== undefined ? data.currentVolumosoKg : '';
 
-  const defaultVolKg = data.currentVolumosoKg !== undefined && data.currentVolumosoKg !== '' 
-    ? Number(data.currentVolumosoKg) 
-    : (volMN > 0 && volMN <= 50 ? volMN : 16.0);
-
-  const currentConcKg = data.currentConcentradoKg !== undefined ? data.currentConcentradoKg : defaultConcKg;
-  const currentVolKg = data.currentVolumosoKg !== undefined ? data.currentVolumosoKg : defaultVolKg;
-
-  const numConcKg = Number(currentConcKg) || 0;
-  const numVolKg = Number(currentVolKg) || 0;
+  const numConcKg = currentConcKg === '' ? 0 : Number(currentConcKg) || 0;
+  const numVolKg = currentVolKg === '' ? 0 : Number(currentVolKg) || 0;
   const totalFeedMN = numConcKg + numVolKg;
 
   // Proportions in MN
@@ -215,47 +208,32 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
 
   // Handlers for updating daily feeding and proportion
   const handleConcKgChange = (val: string) => {
-    const num = val === '' ? '' : Number(val);
-    const updatedConcKg = num;
-    const currentVol = Number(currentVolKg) || 0;
-    const newTotal = (Number(updatedConcKg) || 0) + currentVol;
-    const newConcPct = newTotal > 0 ? ((Number(updatedConcKg) || 0) / newTotal) * 100 : 0;
-    const newVolPct = newTotal > 0 ? (currentVol / newTotal) * 100 : 0;
+    const updatedConcKg = val === '' ? '' : Number(val);
+    const numConc = updatedConcKg === '' ? 0 : Number(updatedConcKg) || 0;
+    const numVol = currentVolKg === '' ? 0 : Number(currentVolKg) || 0;
+    const newTotal = numConc + numVol;
+    const newConcPct = newTotal > 0 ? (numConc / newTotal) * 100 : 0;
+    const newVolPct = newTotal > 0 ? (numVol / newTotal) * 100 : 0;
 
     updateData({
       currentConcentradoKg: updatedConcKg,
-      currentConcentradoPercent: Math.round(newConcPct),
-      currentVolumosoPercent: Math.round(newVolPct)
+      currentConcentradoPercent: newTotal > 0 ? Math.round(newConcPct) : undefined,
+      currentVolumosoPercent: newTotal > 0 ? Math.round(newVolPct) : undefined
     });
   };
 
   const handleVolKgChange = (val: string) => {
-    const num = val === '' ? '' : Number(val);
-    const updatedVolKg = num;
-    const currentConc = Number(currentConcKg) || 0;
-    const newTotal = currentConc + (Number(updatedVolKg) || 0);
-    const newConcPct = newTotal > 0 ? (currentConc / newTotal) * 100 : 0;
-    const newVolPct = newTotal > 0 ? ((Number(updatedVolKg) || 0) / newTotal) * 100 : 0;
+    const updatedVolKg = val === '' ? '' : Number(val);
+    const numVol = updatedVolKg === '' ? 0 : Number(updatedVolKg) || 0;
+    const numConc = currentConcKg === '' ? 0 : Number(currentConcKg) || 0;
+    const newTotal = numConc + numVol;
+    const newConcPct = newTotal > 0 ? (numConc / newTotal) * 100 : 0;
+    const newVolPct = newTotal > 0 ? (numVol / newTotal) * 100 : 0;
 
     updateData({
       currentVolumosoKg: updatedVolKg,
-      currentConcentradoPercent: Math.round(newConcPct),
-      currentVolumosoPercent: Math.round(newVolPct)
-    });
-  };
-
-  const handleProportionChange = (concPctVal: number) => {
-    const concPct = Math.max(0, Math.min(100, concPctVal));
-    const volPct = 100 - concPct;
-    const total = totalFeedMN > 0 ? totalFeedMN : 20; // preserve total or default to 20kg
-    const newConcKg = Number(((concPct / 100) * total).toFixed(2));
-    const newVolKg = Number(((volPct / 100) * total).toFixed(2));
-
-    updateData({
-      currentConcentradoPercent: concPct,
-      currentVolumosoPercent: volPct,
-      currentConcentradoKg: newConcKg,
-      currentVolumosoKg: newVolKg
+      currentConcentradoPercent: newTotal > 0 ? Math.round(newConcPct) : undefined,
+      currentVolumosoPercent: newTotal > 0 ? Math.round(newVolPct) : undefined
     });
   };
 
@@ -279,7 +257,7 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
       <div className="bg-gradient-to-r from-blue-900 to-blue-800 text-white rounded-2xl p-6 sm:p-8 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <div className="inline-flex items-center gap-2 bg-blue-700/60 text-blue-200 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full mb-2">
-            <Info size={14} /> Fase 2: Diagnóstico da Propriedade
+            <FlaskConical size={14} /> Fase 2: Diagnóstico da Propriedade
           </div>
           <h2 className="text-xl sm:text-2xl font-black">Concentrado e Volumoso Atual</h2>
           <p className="text-blue-100 text-xs mt-1 max-w-2xl leading-relaxed">
@@ -329,7 +307,7 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
           </div>
 
           {/* Concentrates Table */}
-          <div className="border border-gray-100 rounded-xl overflow-hidden mb-4">
+          <div className="border border-gray-100 rounded-xl overflow-visible mb-4">
             <div className="grid grid-cols-12 gap-3 pb-3 pt-3 bg-gray-50/80 border-b border-gray-200 text-xs font-bold text-gray-500 px-4 uppercase">
               <div className="col-span-2">Tipo</div>
               <div className="col-span-4">Insumo</div>
@@ -358,15 +336,13 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
                         </span>
                       </div>
                       <div className="col-span-4">
-                        <select 
-                          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
+                        <SearchableIngredientSelect
                           value={entry.ingredientId}
-                          onChange={(e) => updateConcentrate(entry.id, 'ingredientId', e.target.value)}
-                        >
-                          {MOCK_INGREDIENTS.filter(i => i.type === entry.type).map(i => (
-                            <option key={i.id} value={i.id}>{i.name} ({i.msPercent}% MS)</option>
-                          ))}
-                        </select>
+                          onChange={(newId) => updateConcentrate(entry.id, 'ingredientId', newId)}
+                          ingredients={MOCK_INGREDIENTS.filter(i => i.type === entry.type)}
+                          theme="orange"
+                          placeholder="Buscar insumo..."
+                        />
                       </div>
                       <div className="col-span-2">
                         <input 
@@ -465,7 +441,7 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
           </div>
 
           {/* Volumoso Table */}
-          <div className="border border-gray-100 rounded-xl overflow-hidden mb-4">
+          <div className="border border-gray-100 rounded-xl overflow-visible mb-4">
             <div className="grid grid-cols-12 gap-3 pb-3 pt-3 bg-gray-50/80 border-b border-gray-200 text-xs font-bold text-gray-500 px-4 uppercase">
               <div className="col-span-2">Tipo</div>
               <div className="col-span-4">Insumo</div>
@@ -491,15 +467,13 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
                         </span>
                       </div>
                       <div className="col-span-4">
-                        <select 
-                          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                        <SearchableIngredientSelect
                           value={entry.ingredientId}
-                          onChange={(e) => updateVolumoso(entry.id, 'ingredientId', e.target.value)}
-                        >
-                          {MOCK_INGREDIENTS.filter(i => i.type === 'Volumoso').map(i => (
-                            <option key={i.id} value={i.id}>{i.name} ({i.msPercent}% MS)</option>
-                          ))}
-                        </select>
+                          onChange={(newId) => updateVolumoso(entry.id, 'ingredientId', newId)}
+                          ingredients={MOCK_INGREDIENTS.filter(i => i.type === 'Volumoso')}
+                          theme="green"
+                          placeholder="Buscar volumoso..."
+                        />
                       </div>
                       <div className="col-span-2">
                         <input 
@@ -614,9 +588,15 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
                   <span className="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
                   Concentrado Atual
                 </span>
-                <span className="text-xs font-extrabold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-md">
-                  {calculatedConcPctMN.toFixed(0)}% MN
-                </span>
+                {totalFeedMN > 0 ? (
+                  <span className="text-xs font-extrabold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-md">
+                    {calculatedConcPctMN.toFixed(0)}% MN
+                  </span>
+                ) : (
+                  <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-md">
+                    -
+                  </span>
+                )}
               </div>
 
               <div className="mt-3">
@@ -626,9 +606,9 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
                 <div className="relative">
                   <input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     min="0"
-                    placeholder="ex: 4.0"
+                    placeholder="0.00"
                     value={currentConcKg}
                     onChange={(e) => handleConcKgChange(e.target.value)}
                     className="w-full text-2xl font-black text-gray-900 border-2 border-orange-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white shadow-2xs"
@@ -641,7 +621,9 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
 
               <div className="mt-3 pt-3 border-t border-orange-100 flex justify-between items-center text-xs">
                 <span className="text-gray-500 font-medium">Equivalente em MS:</span>
-                <span className="font-bold text-orange-800">{animalConcMS.toFixed(2)} kg MS/dia</span>
+                <span className="font-bold text-orange-800">
+                  {animalConcMS > 0 ? `${animalConcMS.toFixed(2)} kg MS/dia` : '-'}
+                </span>
               </div>
             </div>
 
@@ -652,9 +634,15 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
                   <span className="w-2.5 h-2.5 rounded-full bg-green-500"></span>
                   Volumoso Atual
                 </span>
-                <span className="text-xs font-extrabold text-green-700 bg-green-100 px-2 py-0.5 rounded-md">
-                  {calculatedVolPctMN.toFixed(0)}% MN
-                </span>
+                {totalFeedMN > 0 ? (
+                  <span className="text-xs font-extrabold text-green-700 bg-green-100 px-2 py-0.5 rounded-md">
+                    {calculatedVolPctMN.toFixed(0)}% MN
+                  </span>
+                ) : (
+                  <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-md">
+                    -
+                  </span>
+                )}
               </div>
 
               <div className="mt-3">
@@ -664,9 +652,9 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
                 <div className="relative">
                   <input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     min="0"
-                    placeholder="ex: 16.0"
+                    placeholder="0.00"
                     value={currentVolKg}
                     onChange={(e) => handleVolKgChange(e.target.value)}
                     className="w-full text-2xl font-black text-gray-900 border-2 border-green-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white shadow-2xs"
@@ -679,7 +667,9 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
 
               <div className="mt-3 pt-3 border-t border-green-100 flex justify-between items-center text-xs">
                 <span className="text-gray-500 font-medium">Equivalente em MS:</span>
-                <span className="font-bold text-green-800">{animalVolMS.toFixed(2)} kg MS/dia</span>
+                <span className="font-bold text-green-800">
+                  {animalVolMS > 0 ? `${animalVolMS.toFixed(2)} kg MS/dia` : '-'}
+                </span>
               </div>
             </div>
 
@@ -690,7 +680,9 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
                   Consumo Total Real Fornecido
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-black text-white">{totalFeedMN.toFixed(2)}</span>
+                  <span className="text-3xl font-black text-white">
+                    {totalFeedMN > 0 ? totalFeedMN.toFixed(2) : '0.00'}
+                  </span>
                   <span className="text-sm font-semibold text-blue-200">kg MN/animal/dia</span>
                 </div>
               </div>
@@ -698,12 +690,16 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
               <div className="space-y-2 mt-4 pt-3 border-t border-blue-700/60 text-xs">
                 <div className="flex justify-between items-center">
                   <span className="text-blue-200">Consumo Matéria Seca (CMS):</span>
-                  <span className="font-black text-amber-300 text-sm">{totalAnimalMS.toFixed(2)} kg MS/dia</span>
+                  <span className="font-black text-amber-300 text-sm">
+                    {totalAnimalMS > 0 ? `${totalAnimalMS.toFixed(2)} kg MS/dia` : '-'}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center text-[11px]">
                   <span className="text-blue-300">Proporção na Matéria Seca:</span>
                   <span className="font-bold text-white">
-                    {calculatedConcPctMS.toFixed(0)}% Conc : {calculatedVolPctMS.toFixed(0)}% Vol
+                    {totalAnimalMS > 0
+                      ? `${calculatedConcPctMS.toFixed(0)}% Conc : ${calculatedVolPctMS.toFixed(0)}% Vol`
+                      : '-'}
                   </span>
                 </div>
                 <div className="flex justify-between items-center text-[11px]">
@@ -714,40 +710,15 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
             </div>
           </div>
 
-          {/* Quick Proportion Presets / Slider */}
-          <div className="bg-gray-50 rounded-xl p-4 border border-gray-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-gray-700 font-bold">
-              <span>Proporções Rápidas (MN):</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { conc: 20, vol: 80, label: '20% C / 80% V' },
-                { conc: 30, vol: 70, label: '30% C / 70% V' },
-                { conc: 40, vol: 60, label: '40% C / 60% V' },
-                { conc: 50, vol: 50, label: '50% C / 50% V' },
-                { conc: 60, vol: 40, label: '60% C / 40% V' },
-              ].map(preset => (
-                <button
-                  key={preset.label}
-                  type="button"
-                  onClick={() => handleProportionChange(preset.conc)}
-                  className={`px-3 py-1.5 rounded-lg font-bold transition text-xs cursor-pointer border ${
-                    Math.round(calculatedConcPctMN) === preset.conc 
-                      ? 'bg-blue-700 text-white border-blue-800 shadow-2xs' 
-                      : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
-                  }`}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Next step notice */}
           <div className="text-xs text-blue-900 bg-blue-50/70 p-4 rounded-xl border border-blue-200/60 flex items-center gap-2">
             <Sparkles size={16} className="text-blue-600 shrink-0" />
             <span>
-              <strong>Próximo passo:</strong> Na Etapa 3 (Dieta Atual), o sistema apresentará o diagnóstico nutricional calculado estritamente com base nesses <strong>{totalFeedMN.toFixed(2)} kg MN</strong> e na proporção <strong>{calculatedConcPctMN.toFixed(0)}% C : {calculatedVolPctMN.toFixed(0)}% V</strong>, sem forçar a exigência teórica do perfil.
+              <strong>Próximo passo:</strong> Na Etapa 3 (Dieta Atual), o sistema apresentará o diagnóstico nutricional calculado estritamente com base {totalFeedMN > 0 ? (
+                <>nesses <strong>{totalFeedMN.toFixed(2)} kg MN</strong> e na proporção <strong>{calculatedConcPctMN.toFixed(0)}% C : {calculatedVolPctMN.toFixed(0)}% V</strong></>
+              ) : (
+                'nas quantidades de MN fornecidas'
+              )}, sem forçar a exigência teórica do perfil.
             </span>
           </div>
         </div>

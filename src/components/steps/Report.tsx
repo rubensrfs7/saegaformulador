@@ -28,26 +28,33 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
   const resolveDietItems = (entries: typeof data.currentConcentrates, defaultFeedType: string) => {
     let sumMS = 0;
     let sumMN = 0;
+    let sumCost = 0;
     const items = entries.map(entry => {
       const itemInfo = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
       if (!itemInfo) return null;
       const mnVal = Number(entry.mn) || 0;
       const msVal = entry.mn === '' ? 0 : mnVal * (itemInfo.msPercent / 100);
+      const priceKg = entry.pricePerKg !== undefined && entry.pricePerKg !== '' ? Number(entry.pricePerKg) : 0;
+      const batchCost = mnVal * priceKg;
       sumMS += msVal;
       sumMN += mnVal;
-      return { ...entry, itemInfo, mnVal, msVal, feedType: entry.type || defaultFeedType };
+      sumCost += batchCost;
+      return { ...entry, itemInfo, mnVal, msVal, priceKg, batchCost, feedType: entry.type || defaultFeedType };
     }).filter(Boolean) as {
       id: string;
       ingredientId: string;
       type: string;
       mn: number | '';
       ms: number | '';
+      pricePerKg?: number | '';
+      priceKg: number;
+      batchCost: number;
       itemInfo: typeof MOCK_INGREDIENTS[0];
       mnVal: number;
       msVal: number;
       feedType: string;
     }[];
-    return { items, sumMS, sumMN };
+    return { items, sumMS, sumMN, sumCost };
   };
 
   // 1. Raw Batches
@@ -59,29 +66,28 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
 
   // ================= DIETA ATUAL (REAL DA FAZENDA) =================
   // Quantidade fornecida por animal definida na Etapa 2
-  const defaultCurrConcKg = data.currentConcentradoKg !== undefined && data.currentConcentradoKg !== '' 
+  const currAnimalConcDailyMN = data.currentConcentradoKg !== undefined && data.currentConcentradoKg !== '' 
     ? Number(data.currentConcentradoKg) 
-    : (currConcRaw.sumMN > 0 && currConcRaw.sumMN <= 25 ? currConcRaw.sumMN : 4.0);
+    : (currConcRaw.sumMN > 0 && currConcRaw.sumMN <= 25 ? currConcRaw.sumMN : 0);
 
-  const defaultCurrVolKg = data.currentVolumosoKg !== undefined && data.currentVolumosoKg !== '' 
+  const currAnimalVolDailyMN = data.currentVolumosoKg !== undefined && data.currentVolumosoKg !== '' 
     ? Number(data.currentVolumosoKg) 
-    : (currVolRaw.sumMN > 0 && currVolRaw.sumMN <= 50 ? currVolRaw.sumMN : 16.0);
-
-  const currAnimalConcDailyMN = Number(data.currentConcentradoKg !== undefined ? data.currentConcentradoKg : defaultCurrConcKg) || 0;
-  const currAnimalVolDailyMN = Number(data.currentVolumosoKg !== undefined ? data.currentVolumosoKg : defaultCurrVolKg) || 0;
+    : (currVolRaw.sumMN > 0 && currVolRaw.sumMN <= 50 ? currVolRaw.sumMN : 0);
 
   const currAnimalConcItems = currConcRaw.items.map(item => {
     const pct = currConcRaw.sumMN > 0 ? item.mnVal / currConcRaw.sumMN : 0;
     const mnVal = pct * currAnimalConcDailyMN;
     const msVal = mnVal * (item.itemInfo.msPercent / 100);
-    return { ...item, mnVal, msVal, pct: pct * 100, batchMN: item.mnVal };
+    const dailyCost = mnVal * item.priceKg;
+    return { ...item, mnVal, msVal, pct: pct * 100, batchMN: item.mnVal, dailyCost };
   });
 
   const currAnimalVolItems = currVolRaw.items.map(item => {
     const pct = currVolRaw.sumMN > 0 ? item.mnVal / currVolRaw.sumMN : 0;
     const mnVal = pct * currAnimalVolDailyMN;
     const msVal = mnVal * (item.itemInfo.msPercent / 100);
-    return { ...item, mnVal, msVal, pct: pct * 100, batchMN: item.mnVal };
+    const dailyCost = mnVal * item.priceKg;
+    return { ...item, mnVal, msVal, pct: pct * 100, batchMN: item.mnVal, dailyCost };
   });
 
   const currAnimalItems = [...currAnimalConcItems, ...currAnimalVolItems];
@@ -89,6 +95,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
   const currTotalVolMS = currAnimalVolItems.reduce((acc, i) => acc + i.msVal, 0);
   const currTotalMS = currTotalConcMS + currTotalVolMS;
   const currTotalMN = currAnimalConcDailyMN + currAnimalVolDailyMN;
+  const currTotalCostDailyPerAnimal = currAnimalItems.reduce((acc, i) => acc + i.dailyCost, 0);
 
   let currPB = 0, currNDT = 0, currFDN = 0, currAmido = 0, currCa = 0, currP = 0;
   currAnimalItems.forEach(c => {
@@ -111,14 +118,22 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
     const pct = adjConcRaw.sumMN > 0 ? item.mnVal / adjConcRaw.sumMN : 0;
     const mnVal = pct * adjAnimalConcDailyMN;
     const msVal = mnVal * (item.itemInfo.msPercent / 100);
-    return { ...item, mnVal, msVal, pct: pct * 100, batchMN: item.mnVal };
+    const dailyCost = mnVal * item.priceKg;
+    const lotDailyCost = dailyCost * animais;
+    const lotTotalPeriodCost = lotDailyCost * days;
+    const lotTotalPeriodKg = mnVal * animais * days;
+    return { ...item, mnVal, msVal, pct: pct * 100, batchMN: item.mnVal, dailyCost, lotDailyCost, lotTotalPeriodCost, lotTotalPeriodKg };
   });
 
   const adjAnimalVolItems = adjVolRaw.items.map(item => {
     const pct = adjVolRaw.sumMN > 0 ? item.mnVal / adjVolRaw.sumMN : 0;
     const mnVal = pct * adjAnimalVolDailyMN;
     const msVal = mnVal * (item.itemInfo.msPercent / 100);
-    return { ...item, mnVal, msVal, pct: pct * 100, batchMN: item.mnVal };
+    const dailyCost = mnVal * item.priceKg;
+    const lotDailyCost = dailyCost * animais;
+    const lotTotalPeriodCost = lotDailyCost * days;
+    const lotTotalPeriodKg = mnVal * animais * days;
+    return { ...item, mnVal, msVal, pct: pct * 100, batchMN: item.mnVal, dailyCost, lotDailyCost, lotTotalPeriodCost, lotTotalPeriodKg };
   });
 
   const adjAnimalItems = [...adjAnimalConcItems, ...adjAnimalVolItems];
@@ -126,6 +141,15 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
   const adjTotalVolMS = adjAnimalVolItems.reduce((acc, i) => acc + i.msVal, 0);
   const adjTotalMS = adjTotalConcMS + adjTotalVolMS;
   const adjTotalMN = adjAnimalConcDailyMN + adjAnimalVolDailyMN;
+
+  // Totais Econômicos da Dieta Ajustada
+  const adjTotalConcCostDaily = adjAnimalConcItems.reduce((acc, i) => acc + i.dailyCost, 0);
+  const adjTotalVolCostDaily = adjAnimalVolItems.reduce((acc, i) => acc + i.dailyCost, 0);
+  const adjTotalCostDailyPerAnimal = adjTotalConcCostDaily + adjTotalVolCostDaily;
+  const adjCostPerAnimalPeriod = adjTotalCostDailyPerAnimal * days;
+  const adjLoteDailyCost = adjTotalCostDailyPerAnimal * animais;
+  const adjLotePeriodCost = adjLoteDailyCost * days;
+  const adjCostPerKgMS = adjTotalMS > 0 ? adjTotalCostDailyPerAnimal / adjTotalMS : 0;
 
   let adjPB = 0, adjNDT = 0, adjFDN = 0, adjAmido = 0, adjCa = 0, adjP = 0;
   adjAnimalItems.forEach(c => {
@@ -408,6 +432,23 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                     </td>
                     <td className="py-2.5 px-3 text-right text-green-700 border-l border-blue-200">
                       {hasAdjustedDiet ? `${(adjTotalMS - currTotalMS >= 0 ? '+' : '')}${(adjTotalMS - currTotalMS).toFixed(2)} kg` : '-'}
+                    </td>
+                  </tr>
+
+                  {/* Custo Estimado por Cabeça/Dia */}
+                  <tr className="bg-emerald-50/40 font-black">
+                    <td className="py-2.5 px-3 text-emerald-950 uppercase text-[11px]">Custo Estimado por Animal/Dia</td>
+                    <td className="py-2.5 px-3 text-right text-orange-950 bg-orange-100/40 border-l border-orange-200 text-sm">
+                      {currTotalCostDailyPerAnimal > 0 ? `R$ ${currTotalCostDailyPerAnimal.toFixed(2)}` : '-'}
+                    </td>
+                    <td className="py-2.5 px-3 text-right text-emerald-900 bg-emerald-100/50 border-l border-emerald-200 text-sm">
+                      {hasAdjustedDiet && adjTotalCostDailyPerAnimal > 0 ? `R$ ${adjTotalCostDailyPerAnimal.toFixed(2)}` : '-'}
+                    </td>
+                    <td className="py-2.5 px-3 text-right text-gray-400 border-l border-gray-200 text-xs">-</td>
+                    <td className="py-2.5 px-3 text-right font-bold border-l border-gray-200 text-emerald-800">
+                      {hasAdjustedDiet && adjTotalCostDailyPerAnimal > 0 && currTotalCostDailyPerAnimal > 0 
+                        ? `${(adjTotalCostDailyPerAnimal - currTotalCostDailyPerAnimal >= 0 ? '+' : '')}R$ ${(adjTotalCostDailyPerAnimal - currTotalCostDailyPerAnimal).toFixed(2)}/dia` 
+                        : (adjTotalCostDailyPerAnimal > 0 ? `R$ ${adjTotalCostDailyPerAnimal.toFixed(2)}/dia` : '-')}
                     </td>
                   </tr>
                 </tbody>
@@ -995,7 +1036,318 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
           {/* Footer note */}
           <div className="pt-4 border-t border-gray-100 flex justify-between items-center text-[10px] text-gray-400">
             <span>SAEGA - Sistema de Avaliação e Formulação Nutricional</span>
-            <span>Relatório gerado em 2 páginas A4 - Uso Profissional</span>
+            <span>Relatório gerado em 3 páginas A4 - Uso Profissional</span>
+          </div>
+        </div>
+
+        {/* ================= PAGE 3 ================= */}
+        <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-8 sm:p-12 print:shadow-none print:border-none print:p-0 print:m-0 w-full print-page overflow-hidden">
+          {/* Header on page 3 */}
+          <div className="flex justify-between items-end border-b-2 border-gray-200 pb-3 mb-6">
+            <span className="text-xs font-bold text-blue-700 uppercase">SAEGA NUTRIÇÃO - PLANEJAMENTO ECONÔMICO E FINANCEIRO</span>
+            <span className="text-xs text-gray-400 font-bold">PÁGINA 3 / 3</span>
+          </div>
+
+          {/* Title of Section 8 */}
+          <div className="text-center mb-6">
+            <div className="text-xs font-bold text-emerald-700 tracking-widest uppercase mb-1">
+              Planejamento Econômico e Orçamento de Insumos
+            </div>
+            <h2 className="text-xl font-black text-gray-800 uppercase">
+              Custos por Animal e Investimento Total do Lote ({animais} {animais === 1 ? 'Animal' : 'Animais'}, {days} {days === 1 ? 'Dia' : 'Dias'})
+            </h2>
+          </div>
+
+          {/* Destaques Financeiros em 4 Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3.5 text-center">
+              <span className="text-[10px] font-bold text-emerald-800 uppercase block mb-1">Gasto por Cabeça / Dia</span>
+              <div className="text-xl font-black text-emerald-900">
+                {adjTotalCostDailyPerAnimal > 0 ? `R$ ${adjTotalCostDailyPerAnimal.toFixed(2)}` : 'R$ 0,00'}
+              </div>
+              <span className="text-[10px] text-emerald-700 font-medium block mt-0.5">
+                Conc: R$ {adjTotalConcCostDaily.toFixed(2)} | Vol: R$ {adjTotalVolCostDaily.toFixed(2)}
+              </span>
+            </div>
+
+            <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3.5 text-center">
+              <span className="text-[10px] font-bold text-emerald-800 uppercase block mb-1">Gasto por Cabeça ({days} d)</span>
+              <div className="text-xl font-black text-emerald-900">
+                {adjCostPerAnimalPeriod > 0 ? `R$ ${adjCostPerAnimalPeriod.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'R$ 0,00'}
+              </div>
+              <span className="text-[10px] text-emerald-700 font-medium block mt-0.5">
+                Investimento por animal no período
+              </span>
+            </div>
+
+            <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3.5 text-center">
+              <span className="text-[10px] font-bold text-emerald-800 uppercase block mb-1">Desembolso Diário Rebanho</span>
+              <div className="text-xl font-black text-emerald-950">
+                {adjLoteDailyCost > 0 ? `R$ ${adjLoteDailyCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'R$ 0,00'}
+              </div>
+              <span className="text-[10px] text-emerald-700 font-medium block mt-0.5">
+                Para o lote de {animais} cabeças / dia
+              </span>
+            </div>
+
+            <div className="bg-emerald-700 text-white border border-emerald-800 rounded-xl p-3.5 text-center shadow-xs">
+              <span className="text-[10px] font-bold text-emerald-100 uppercase tracking-wide block mb-1">
+                Investimento Total Lote
+              </span>
+              <div className="text-xl font-black text-amber-300">
+                {adjLotePeriodCost > 0 ? `R$ ${adjLotePeriodCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'R$ 0,00'}
+              </div>
+              <span className="text-[10px] text-emerald-100 font-medium block mt-0.5">
+                {animais} cab. × {days} dias
+              </span>
+            </div>
+          </div>
+
+          {/* Formula calculation notice */}
+          <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 mb-6 text-xs text-gray-700 flex flex-wrap justify-between items-center gap-2">
+            <div>
+              <span className="font-bold text-emerald-800">Fórmula de Multiplicação: </span>
+              <span>Gasto Diário por Animal (<strong>R$ {adjTotalCostDailyPerAnimal.toFixed(2)}</strong>) × <strong>{animais} {animais === 1 ? 'animal' : 'animais'}</strong> × <strong>{days} {days === 1 ? 'dia' : 'dias'}</strong></span>
+            </div>
+            <div className="font-bold text-emerald-900 bg-emerald-100/70 px-2.5 py-0.5 rounded-md">
+              Total = R$ {adjLotePeriodCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+          </div>
+
+          {/* Tabela Completa de Compras e Orçamento dos Insumos */}
+          <section className="mb-6 break-inside-avoid">
+            <h3 className="text-xs font-bold text-blue-800 tracking-wider uppercase mb-2 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                8. Detalhamento de Custos por Insumo e Orçamento de Compras do Lote
+              </span>
+              <span className="text-[11px] text-gray-400 lowercase font-normal">
+                (Multiplicado por {animais} cabeças e {days} dias)
+              </span>
+            </h3>
+
+            <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200 font-bold uppercase text-[10px] text-gray-600">
+                    <th className="py-2.5 px-3 text-left">Insumo</th>
+                    <th className="py-2.5 px-2 text-center">Tipo</th>
+                    <th className="py-2.5 px-3 text-right">Consumo/Cab/Dia</th>
+                    <th className="py-2.5 px-3 text-right bg-emerald-50/50 text-emerald-950 border-l border-emerald-100">
+                      Preço (R$/kg)
+                    </th>
+                    <th className="py-2.5 px-3 text-right bg-emerald-50/50 text-emerald-950">
+                      Custo/Cab/Dia
+                    </th>
+                    <th className="py-2.5 px-3 text-right border-l border-gray-200">
+                      Demanda Lote ({days} d)
+                    </th>
+                    <th className="py-2.5 px-3 text-right bg-emerald-100/40 text-emerald-950 font-black border-l border-emerald-200">
+                      Gasto Total Lote (R$)
+                    </th>
+                    <th className="py-2.5 px-3 text-right text-gray-500">
+                      % Custo
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {/* Concentrados */}
+                  {adjAnimalConcItems.map(item => {
+                    const pctOfTotalCost = adjLotePeriodCost > 0 ? (item.lotTotalPeriodCost / adjLotePeriodCost) * 100 : 0;
+                    return (
+                      <tr key={item.id} className="hover:bg-orange-50/20">
+                        <td className="py-2 px-3 font-semibold text-gray-800">{item.itemInfo.name}</td>
+                        <td className="py-2 px-2 text-center">
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${
+                            item.type === 'Concentrado' ? 'bg-orange-50 text-orange-600 border-orange-200' : 
+                            'bg-slate-50 text-slate-600 border-slate-200'
+                          }`}>
+                            {item.type}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-right text-gray-700">
+                          {item.mnVal.toFixed(2)} kg
+                        </td>
+                        <td className="py-2 px-3 text-right font-medium text-emerald-800 bg-emerald-50/20 border-l border-emerald-100">
+                          {item.priceKg > 0 ? `R$ ${item.priceKg.toFixed(2)}` : '-'}
+                        </td>
+                        <td className="py-2 px-3 text-right font-bold text-emerald-900 bg-emerald-50/20">
+                          {item.dailyCost > 0 ? `R$ ${item.dailyCost.toFixed(2)}` : '-'}
+                        </td>
+                        <td className="py-2 px-3 text-right text-gray-700 border-l border-gray-200">
+                          {item.lotTotalPeriodKg.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg
+                          {item.lotTotalPeriodKg >= 1000 && (
+                            <span className="text-[10px] text-gray-400 block font-normal">
+                              ({(item.lotTotalPeriodKg / 1000).toFixed(2)} ton)
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-right font-black text-emerald-900 bg-emerald-100/30 border-l border-emerald-200">
+                          {item.lotTotalPeriodCost > 0 ? `R$ ${item.lotTotalPeriodCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                        </td>
+                        <td className="py-2 px-3 text-right text-gray-500 font-medium">
+                          {pctOfTotalCost > 0 ? `${pctOfTotalCost.toFixed(1)}%` : '-'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {/* Subtotal Concentrado */}
+                  {adjAnimalConcItems.length > 0 && (
+                    <tr className="bg-[#fffcf8] font-bold border-t border-b border-orange-200 text-orange-950">
+                      <td colSpan={2} className="py-2 px-3 uppercase text-[10px] text-orange-900">
+                        Subtotal Concentrado
+                      </td>
+                      <td className="py-2 px-3 text-right font-bold text-orange-900">
+                        {adjAnimalConcDailyMN.toFixed(2)} kg
+                      </td>
+                      <td className="py-2 px-3 text-right border-l border-emerald-100 text-emerald-800 text-[10px]">
+                        Méd: R$ {adjConcRaw.sumMN > 0 ? (adjConcRaw.sumCost / adjConcRaw.sumMN).toFixed(2) : '0.00'}
+                      </td>
+                      <td className="py-2 px-3 text-right font-black text-emerald-900 bg-emerald-50/20">
+                        R$ {adjTotalConcCostDaily.toFixed(2)}
+                      </td>
+                      <td className="py-2 px-3 text-right text-orange-900 border-l border-gray-200">
+                        {(adjAnimalConcDailyMN * animais * days).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg
+                      </td>
+                      <td className="py-2 px-3 text-right font-black text-emerald-950 bg-emerald-100/30 border-l border-emerald-200">
+                        R$ {(adjTotalConcCostDaily * animais * days).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-2 px-3 text-right text-orange-800 font-bold">
+                        {adjLotePeriodCost > 0 ? `${(((adjTotalConcCostDaily * animais * days) / adjLotePeriodCost) * 100).toFixed(1)}%` : '-'}
+                      </td>
+                    </tr>
+                  )}
+
+                  {/* Volumosos */}
+                  {adjAnimalVolItems.map(item => {
+                    const pctOfTotalCost = adjLotePeriodCost > 0 ? (item.lotTotalPeriodCost / adjLotePeriodCost) * 100 : 0;
+                    return (
+                      <tr key={item.id} className="hover:bg-green-50/20">
+                        <td className="py-2 px-3 font-semibold text-gray-800">{item.itemInfo.name}</td>
+                        <td className="py-2 px-2 text-center">
+                          <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase border bg-green-50 text-green-700 border-green-200">
+                            Volumoso
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-right text-gray-700">
+                          {item.mnVal.toFixed(2)} kg
+                        </td>
+                        <td className="py-2 px-3 text-right font-medium text-emerald-800 bg-emerald-50/20 border-l border-emerald-100">
+                          {item.priceKg > 0 ? `R$ ${item.priceKg.toFixed(2)}` : '-'}
+                        </td>
+                        <td className="py-2 px-3 text-right font-bold text-emerald-900 bg-emerald-50/20">
+                          {item.dailyCost > 0 ? `R$ ${item.dailyCost.toFixed(2)}` : '-'}
+                        </td>
+                        <td className="py-2 px-3 text-right text-gray-700 border-l border-gray-200">
+                          {item.lotTotalPeriodKg.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg
+                          {item.lotTotalPeriodKg >= 1000 && (
+                            <span className="text-[10px] text-gray-400 block font-normal">
+                              ({(item.lotTotalPeriodKg / 1000).toFixed(2)} ton)
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-right font-black text-emerald-900 bg-emerald-100/30 border-l border-emerald-200">
+                          {item.lotTotalPeriodCost > 0 ? `R$ ${item.lotTotalPeriodCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                        </td>
+                        <td className="py-2 px-3 text-right text-gray-500 font-medium">
+                          {pctOfTotalCost > 0 ? `${pctOfTotalCost.toFixed(1)}%` : '-'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {/* Subtotal Volumoso */}
+                  {adjAnimalVolItems.length > 0 && (
+                    <tr className="bg-[#f7fdf9] font-bold border-t border-b border-green-200 text-green-950">
+                      <td colSpan={2} className="py-2 px-3 uppercase text-[10px] text-green-900">
+                        Subtotal Volumoso
+                      </td>
+                      <td className="py-2 px-3 text-right font-bold text-green-900">
+                        {adjAnimalVolDailyMN.toFixed(2)} kg
+                      </td>
+                      <td className="py-2 px-3 text-right border-l border-emerald-100 text-emerald-800 text-[10px]">
+                        Méd: R$ {adjVolRaw.sumMN > 0 ? (adjVolRaw.sumCost / adjVolRaw.sumMN).toFixed(2) : '0.00'}
+                      </td>
+                      <td className="py-2 px-3 text-right font-black text-emerald-900 bg-emerald-50/20">
+                        R$ {adjTotalVolCostDaily.toFixed(2)}
+                      </td>
+                      <td className="py-2 px-3 text-right text-green-900 border-l border-gray-200">
+                        {(adjAnimalVolDailyMN * animais * days).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg
+                      </td>
+                      <td className="py-2 px-3 text-right font-black text-emerald-950 bg-emerald-100/30 border-l border-emerald-200">
+                        R$ {(adjTotalVolCostDaily * animais * days).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-2 px-3 text-right text-green-800 font-bold">
+                        {adjLotePeriodCost > 0 ? `${(((adjTotalVolCostDaily * animais * days) / adjLotePeriodCost) * 100).toFixed(1)}%` : '-'}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+
+                {/* TFOOT TOTAL GERAL */}
+                <tfoot className="border-t-2 border-emerald-300 font-black bg-emerald-900 text-white text-xs">
+                  <tr>
+                    <td colSpan={2} className="py-3 px-3 uppercase tracking-wider text-emerald-100">
+                      TOTAL DO LOTE ({animais} Cab, {days} Dias)
+                    </td>
+                    <td className="py-3 px-3 text-right text-emerald-100">
+                      {adjTotalMN.toFixed(2)} kg/dia
+                    </td>
+                    <td className="py-3 px-3 text-right border-l border-emerald-800 text-emerald-200 text-[10px]">
+                      Méd: R$ {adjTotalMN > 0 ? (adjTotalCostDailyPerAnimal / adjTotalMN).toFixed(2) : '0.00'}
+                    </td>
+                    <td className="py-3 px-3 text-right text-amber-300 text-sm">
+                      R$ {adjTotalCostDailyPerAnimal.toFixed(2)}
+                    </td>
+                    <td className="py-3 px-3 text-right text-emerald-100 border-l border-emerald-800">
+                      {(adjTotalMN * animais * days).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg MN
+                    </td>
+                    <td className="py-3 px-3 text-right text-amber-300 border-l border-emerald-800 text-sm">
+                      R$ {adjLotePeriodCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="py-3 px-3 text-right text-emerald-200">
+                      100%
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </section>
+
+          {/* Indicadores complementares de custo */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5">
+              <span className="text-[10px] font-bold text-gray-500 uppercase block mb-0.5">Custo por kg de Matéria Seca (CMS)</span>
+              <div className="text-base font-bold text-gray-800">
+                {adjCostPerKgMS > 0 ? `R$ ${adjCostPerKgMS.toFixed(2)} / kg MS` : '-'}
+              </div>
+              <span className="text-[10px] text-gray-400">Relação direta com eficiência biológica</span>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5">
+              <span className="text-[10px] font-bold text-gray-500 uppercase block mb-0.5">Participação Financeira</span>
+              <div className="text-base font-bold text-gray-800">
+                {adjTotalCostDailyPerAnimal > 0 
+                  ? `${((adjTotalConcCostDaily / adjTotalCostDailyPerAnimal) * 100).toFixed(0)}% Conc. : ${((adjTotalVolCostDaily / adjTotalCostDailyPerAnimal) * 100).toFixed(0)}% Vol.` 
+                  : '-'}
+              </div>
+              <span className="text-[10px] text-gray-400">Distribuição do orçamento diário</span>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5">
+              <span className="text-[10px] font-bold text-gray-500 uppercase block mb-0.5">Volume Total em Toneladas</span>
+              <div className="text-base font-bold text-gray-800">
+                {((adjTotalMN * animais * days) / 1000).toFixed(2)} toneladas MN
+              </div>
+              <span className="text-[10px] text-gray-400">Demanda física de estocagem</span>
+            </div>
+          </div>
+
+          {/* Footer note */}
+          <div className="pt-4 border-t border-gray-100 flex justify-between items-center text-[10px] text-gray-400">
+            <span>SAEGA - Sistema de Avaliação e Formulação Nutricional</span>
+            <span>Relatório gerado em 3 páginas A4 - Uso Profissional</span>
           </div>
         </div>
       </div>

@@ -39,6 +39,7 @@ export interface IngredientEntry {
   type: string;
   mn: number | ''; // input value (kg Natural Matter)
   ms: number | ''; // dry matter calculated or input value (kg Dry Matter)
+  pricePerKg?: number | ''; // Preço por kg em R$ (R$/kg MN)
 }
 
 export interface IngredientDef {
@@ -49,7 +50,14 @@ export interface IngredientDef {
   ndt: number;   // g/kg
   fdn: number;   // g/kg
   amido: number; // g/kg
-  calcio: number;// g/kg
-  fosforo: number;// g/kg
+  calcio: number;// g/kg (CA)
+  fosforo: number;// g/kg (P)
   msPercent: number; // percent 0-100
+  matMineral?: number; // g/kg (Matéria Mineral)
+  mg?: number; // g/kg (Magnésio)
+  s?: number; // g/kg (Enxofre)
+  k?: number; // g/kg (Potássio)
+  na?: number; // g/kg (Sódio)
+  cl?: number | string; // g/kg (Cloro)
+  cu?: number; // mg/kg (Cobre)
 }

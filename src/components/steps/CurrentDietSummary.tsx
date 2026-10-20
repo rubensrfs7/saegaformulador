@@ -1,4 +1,4 @@
-import { ArrowUp, ArrowDown, FileText, Sparkles, Scale, Info, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { ArrowUp, ArrowDown, FileText, Sparkles, Scale, Info, ArrowRight, CheckCircle2, FlaskConical } from 'lucide-react';
 import { FormulationState } from '../../types';
 import { MOCK_INGREDIENTS, CONSUMPTION_TARGETS } from '../../data';
 
@@ -39,16 +39,13 @@ export default function CurrentDietSummary({ data, onJumpToReport, onProceedToAd
   });
 
   // Quantidade real fornecida por animal da Etapa 2
-  const defaultConcKg = data.currentConcentradoKg !== undefined && data.currentConcentradoKg !== '' 
+  const animalConcDailyMN = data.currentConcentradoKg !== undefined && data.currentConcentradoKg !== '' 
     ? Number(data.currentConcentradoKg) 
-    : (batchConcMN > 0 && batchConcMN <= 25 ? batchConcMN : 4.0);
+    : (batchConcMN > 0 && batchConcMN <= 25 ? batchConcMN : 0);
 
-  const defaultVolKg = data.currentVolumosoKg !== undefined && data.currentVolumosoKg !== '' 
+  const animalVolDailyMN = data.currentVolumosoKg !== undefined && data.currentVolumosoKg !== '' 
     ? Number(data.currentVolumosoKg) 
-    : (batchVolMN > 0 && batchVolMN <= 50 ? batchVolMN : 16.0);
-
-  const animalConcDailyMN = Number(data.currentConcentradoKg !== undefined ? data.currentConcentradoKg : defaultConcKg) || 0;
-  const animalVolDailyMN = Number(data.currentVolumosoKg !== undefined ? data.currentVolumosoKg : defaultVolKg) || 0;
+    : (batchVolMN > 0 && batchVolMN <= 50 ? batchVolMN : 0);
 
   // Insumos distribuídos pela proporção da batelada e quantidade real por animal
   let totalConcMN = 0;
@@ -149,7 +146,7 @@ export default function CurrentDietSummary({ data, onJumpToReport, onProceedToAd
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-7 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sm:gap-6">
         <div className="flex-1 min-w-0">
           <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full mb-2">
-            <Info size={14} /> Fase 3: Dieta Atual Consolidada
+            <FlaskConical size={14} /> Fase 3: Dieta Atual Consolidada
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-gray-800">Diagnóstico da Dieta Atual</h2>
           <p className="text-gray-500 text-xs mt-1 max-w-2xl leading-relaxed">
@@ -242,55 +239,6 @@ export default function CurrentDietSummary({ data, onJumpToReport, onProceedToAd
         </div>
       </div>
 
-      {/* NUTRITIONAL 6 CARDS: PB, NDT, FDN, AMIDO, CÁLCIO, FÓSFORO */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-            <div>
-              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-700"></span>
-                Diagnóstico Nutricional Consolidado da Dieta Atual
-              </h3>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Valores reais entregues pela combinação atual de concentrado e volumoso vs Exigência Teórica do animal
-              </p>
-            </div>
-            <div className="text-xs text-gray-400 font-medium">
-              Base: {totalMS.toFixed(2)} kg MS de consumo diário
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6">
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-            {nutrientCards.map((card, i) => (
-              <div key={i} className="border border-gray-100 bg-gray-50/70 rounded-xl p-3.5 flex flex-col justify-between">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase">{card.label}</span>
-                  {renderIndicator(card.value, card.target)}
-                </div>
-                <div>
-                  <div className={`text-xl font-black ${getNutrientColor(card.value, card.target)}`}>
-                    {card.value.toFixed(1).replace(/\.0$/, '')}
-                    <span className="text-[10px] font-normal text-gray-400 ml-1">g/kg</span>
-                  </div>
-                  <div className="text-xs font-bold text-gray-700 mt-0.5">
-                    {(card.value / 10).toFixed(1)}%
-                  </div>
-                </div>
-
-                <div className="mt-2 pt-2 border-t border-gray-200/50 flex justify-between items-center text-[10px]">
-                  <span className="text-gray-400">Meta:</span>
-                  <span className="font-bold text-gray-600">
-                    {card.target > 0 ? `${(card.target / 10).toFixed(1)}%` : '-'}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
       {/* DETAILED INGREDIENT INTAKE TABLE PER ANIMAL */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100 flex justify-between items-center">
@@ -355,6 +303,55 @@ export default function CurrentDietSummary({ data, onJumpToReport, onProceedToAd
               </tr>
             </tfoot>
           </table>
+        </div>
+      </div>
+
+      {/* NUTRITIONAL 6 CARDS: PB, NDT, FDN, AMIDO, CÁLCIO, FÓSFORO */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <div>
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-700"></span>
+                Diagnóstico Nutricional Consolidado da Dieta Atual
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Valores reais entregues pela combinação atual de concentrado e volumoso vs Exigência Teórica do animal
+              </p>
+            </div>
+            <div className="text-xs text-gray-400 font-medium">
+              Base: {totalMS.toFixed(2)} kg MS de consumo diário
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+            {nutrientCards.map((card, i) => (
+              <div key={i} className="border border-gray-100 bg-gray-50/70 rounded-xl p-3.5 flex flex-col justify-between">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase">{card.label}</span>
+                  {renderIndicator(card.value, card.target)}
+                </div>
+                <div>
+                  <div className={`text-xl font-black ${getNutrientColor(card.value, card.target)}`}>
+                    {card.value.toFixed(1).replace(/\.0$/, '')}
+                    <span className="text-[10px] font-normal text-gray-400 ml-1">g/kg</span>
+                  </div>
+                  <div className="text-xs font-bold text-gray-700 mt-0.5">
+                    {(card.value / 10).toFixed(1)}%
+                  </div>
+                </div>
+
+                <div className="mt-2 pt-2 border-t border-gray-200/50 flex justify-between items-center text-[10px]">
+                  <span className="text-gray-400">Meta:</span>
+                  <span className="font-bold text-gray-600">
+                    {card.target > 0 ? `${(card.target / 10).toFixed(1)}%` : '-'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

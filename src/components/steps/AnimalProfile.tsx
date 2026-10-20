@@ -1,13 +1,15 @@
 import { FormulationState } from '../../types';
-import { Weight, Users, Calendar } from 'lucide-react';
+import { Weight, Users, Calendar, Database, ExternalLink } from 'lucide-react';
+import CowIcon from '../icons/CowIcon';
 import { CONSUMPTION_TARGETS } from '../../data';
 
 interface Props {
   data: FormulationState;
   updateData: (data: Partial<FormulationState>) => void;
+  onOpenDatabase?: () => void;
 }
 
-export default function AnimalProfile({ data, updateData }: Props) {
+export default function AnimalProfile({ data, updateData, onOpenDatabase }: Props) {
   const categories = Array.from(new Set(CONSUMPTION_TARGETS.map(t => t.category)));
   const subcategories = CONSUMPTION_TARGETS.filter(t => t.category === data.category).map(t => t.subcategory);
 
@@ -28,8 +30,27 @@ export default function AnimalProfile({ data, updateData }: Props) {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="p-8">
-        <h2 className="text-2xl font-bold text-gray-800 mb-1">Perfil do Animal</h2>
-        <p className="text-gray-500 mb-8">Configure as informações básicas do animal</p>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+          <div>
+            <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full mb-2">
+              <CowIcon size={14} /> Fase 1: Perfil do Animal
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800">Perfil do Animal</h2>
+            <p className="text-gray-500 text-xs mt-0.5">Configure as informações básicas do animal</p>
+          </div>
+
+          {onOpenDatabase && (
+            <button
+              type="button"
+              onClick={onOpenDatabase}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 transition cursor-pointer border border-blue-200/80 shadow-2xs shrink-0"
+              title="Abrir tabela completa de Consumo de Matéria Seca"
+            >
+              <Database size={14} />
+              <span>Consultar Banco de Dados (18 perfis)</span>
+            </button>
+          )}
+        </div>
 
         <div className="space-y-6">
           <div>

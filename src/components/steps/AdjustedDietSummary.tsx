@@ -1,4 +1,4 @@
-import { ArrowUp, ArrowDown, FileText, CheckCircle2 } from 'lucide-react';
+import { ArrowUp, ArrowDown, FileText, CheckCircle2, FlaskConical } from 'lucide-react';
 import { FormulationState } from '../../types';
 import { MOCK_INGREDIENTS, CONSUMPTION_TARGETS } from '../../data';
 
@@ -47,6 +47,9 @@ export default function AdjustedDietSummary({ data, onGoToReport }: Props) {
   const avgVolMSPercent = batchVolMN > 0 ? (batchVolMS / batchVolMN) : 0;
   const animalVolDailyMN = avgVolMSPercent > 0 ? metaVolumosoMS / avgVolMSPercent : 0;
 
+  const animais = Number(data.quantity) || 1;
+  const days = Number(data.days) || 1;
+
   let totalMS = 0;
   let totalMN = 0;
   let totalConcMN = 0;
@@ -68,9 +71,11 @@ export default function AdjustedDietSummary({ data, onGoToReport }: Props) {
       const pct = batchConcMN > 0 ? (rawMN / batchConcMN) : 0;
       const mnVal = pct * animalConcDailyMN;
       const msVal = mnVal * (itemInfo.msPercent / 100);
+      const priceKg = entry.pricePerKg !== undefined && entry.pricePerKg !== '' ? Number(entry.pricePerKg) : 0;
+      const dailyCost = mnVal * priceKg;
       totalConcMN += mnVal;
       totalConcMS += msVal;
-      return { ...entry, itemInfo, mnVal, msVal, pct: pct * 100, feedGroup: 'Concentrado' };
+      return { ...entry, itemInfo, mnVal, msVal, pct: pct * 100, priceKg, dailyCost, feedGroup: 'Concentrado' };
     }),
     ...data.adjustedVolumosos.map(entry => {
       const itemInfo = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
@@ -79,9 +84,11 @@ export default function AdjustedDietSummary({ data, onGoToReport }: Props) {
       const pct = batchVolMN > 0 ? (rawMN / batchVolMN) : 0;
       const mnVal = pct * animalVolDailyMN;
       const msVal = mnVal * (itemInfo.msPercent / 100);
+      const priceKg = entry.pricePerKg !== undefined && entry.pricePerKg !== '' ? Number(entry.pricePerKg) : 0;
+      const dailyCost = mnVal * priceKg;
       totalVolMN += mnVal;
       totalVolMS += msVal;
-      return { ...entry, itemInfo, mnVal, msVal, pct: pct * 100, feedGroup: 'Volumoso' };
+      return { ...entry, itemInfo, mnVal, msVal, pct: pct * 100, priceKg, dailyCost, feedGroup: 'Volumoso' };
     })
   ].filter(Boolean) as {
     id: string;
@@ -89,12 +96,19 @@ export default function AdjustedDietSummary({ data, onGoToReport }: Props) {
     type: string;
     mn: number | '';
     ms: number | '';
+    pricePerKg?: number | '';
+    priceKg: number;
+    dailyCost: number;
     itemInfo: typeof MOCK_INGREDIENTS[0];
     mnVal: number;
     msVal: number;
     pct: number;
     feedGroup: string;
   }[];
+
+  let totalDietDailyCost = 0;
+  let totalConcDailyCost = 0;
+  let totalVolDailyCost = 0;
 
   combinedAdjustedDiet.forEach(c => {
     totalMS += c.msVal;
@@ -105,7 +119,16 @@ export default function AdjustedDietSummary({ data, onGoToReport }: Props) {
     totalAmido += c.msVal * c.itemInfo.amido;
     totalCalcio += c.msVal * c.itemInfo.calcio;
     totalFosforo += c.msVal * c.itemInfo.fosforo;
+    totalDietDailyCost += c.dailyCost;
+    if (c.feedGroup === 'Concentrado') {
+      totalConcDailyCost += c.dailyCost;
+    } else {
+      totalVolDailyCost += c.dailyCost;
+    }
   });
+
+  const totalLoteDailyCost = totalDietDailyCost * animais;
+  const totalLotePeriodCost = totalLoteDailyCost * days;
 
   const getNutrientColor = (value: number, target: number) => {
     if (!target) return 'text-gray-800';
@@ -142,7 +165,7 @@ export default function AdjustedDietSummary({ data, onGoToReport }: Props) {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-7 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sm:gap-6">
         <div className="flex-1 min-w-0">
           <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full mb-2">
-            <CheckCircle2 size={14} /> Fase 5: Dieta Final Formulada
+            <FlaskConical size={14} /> Fase 5: Dieta Final Formulada
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-gray-800">Dieta Ajustada por Animal</h2>
           <p className="text-gray-500 text-xs mt-1 max-w-2xl leading-relaxed">
@@ -176,59 +199,72 @@ export default function AdjustedDietSummary({ data, onGoToReport }: Props) {
             </div>
           </div>
 
-          <div className="border border-gray-100 rounded-xl overflow-hidden mb-8">
-            <div className="grid grid-cols-12 gap-4 pb-3 pt-3 bg-gray-50 border-b border-gray-200 text-xs font-bold text-gray-500 px-4 uppercase">
-              <div className="col-span-2 hidden md:block">Tipo</div>
-              <div className="col-span-5 md:col-span-4">Insumo</div>
-              <div className="col-span-2 text-right">Consumo MN (kg)</div>
-              <div className="col-span-2 text-right hidden md:block">Consumo MS (kg)</div>
-              <div className="col-span-3 md:col-span-2 text-right">% da Dieta (MS)</div>
-              <div className="col-span-2 md:col-span-2 text-right hidden md:block">% na Batida</div>
-            </div>
-
-            <div className="divide-y divide-gray-100 min-h-[120px]">
-              {combinedAdjustedDiet.length === 0 ? (
-                <div className="text-center text-gray-400 py-12 text-sm">
-                  Nenhum ingrediente adicionado na formulação ajustada.
-                </div>
-              ) : (
-                combinedAdjustedDiet.map((entry, idx) => {
-                  const percentage = totalMS > 0 ? ((entry.msVal / totalMS) * 100).toFixed(1) : '0.0';
-                  return (
-                    <div key={idx} className="grid grid-cols-12 gap-4 items-center text-sm px-4 py-3 hover:bg-gray-50/80 transition-colors">
-                      <div className="col-span-2 hidden md:block">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-                          entry.itemInfo?.type === 'Concentrado' ? 'bg-orange-50 text-orange-600 border-orange-200' : 
-                          entry.itemInfo?.type === 'Mineral' ? 'bg-slate-50 text-slate-600 border-slate-200' :
-                          'bg-green-50 text-green-700 border-green-200'
-                        }`}>
-                          {entry.itemInfo?.type}
-                        </span>
-                      </div>
-                      <div className="col-span-5 md:col-span-4 font-semibold text-gray-800">
-                        {entry.itemInfo?.name}
-                      </div>
-                      <div className="col-span-2 text-right text-gray-700 font-medium">
-                        {entry.mnVal > 0 ? entry.mnVal.toFixed(2) : '-'}
-                      </div>
-                      <div className="col-span-2 text-right hidden md:block text-gray-600 font-semibold">
-                        {entry.msVal.toFixed(2)}
-                      </div>
-                      <div className="col-span-3 md:col-span-2 text-right text-gray-700 font-bold">
-                        {percentage}%
-                      </div>
-                      <div className="col-span-2 text-right hidden md:block text-gray-500 text-xs">
-                        {entry.pct.toFixed(1)}%
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+          <div className="border border-gray-100 rounded-xl overflow-hidden mb-8 overflow-x-auto shadow-2xs">
+            <table className="w-full text-left border-collapse min-w-[700px]">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  <th className="py-3 px-3 w-28">Tipo</th>
+                  <th className="py-3 px-3">Insumo</th>
+                  <th className="py-3 px-3 text-right">Consumo MN (kg)</th>
+                  <th className="py-3 px-3 text-right">Consumo MS (kg)</th>
+                  <th className="py-3 px-3 text-right">% Dieta (MS)</th>
+                  <th className="py-3 px-3 text-right bg-emerald-50/50 text-emerald-900 border-l border-emerald-100">
+                    Preço (R$/kg)
+                  </th>
+                  <th className="py-3 px-3 text-right bg-emerald-50/50 text-emerald-900">
+                    Custo/Dia (R$)
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-sm">
+                {combinedAdjustedDiet.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-center text-gray-400 py-12 text-sm">
+                      Nenhum ingrediente adicionado na formulação ajustada.
+                    </td>
+                  </tr>
+                ) : (
+                  combinedAdjustedDiet.map((entry, idx) => {
+                    const percentage = totalMS > 0 ? ((entry.msVal / totalMS) * 100).toFixed(1) : '0.0';
+                    return (
+                      <tr key={idx} className="hover:bg-gray-50/80 transition-colors">
+                        <td className="py-2.5 px-3">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                            entry.itemInfo?.type === 'Concentrado' ? 'bg-orange-50 text-orange-600 border-orange-200' : 
+                            entry.itemInfo?.type === 'Mineral' ? 'bg-slate-50 text-slate-600 border-slate-200' :
+                            'bg-green-50 text-green-700 border-green-200'
+                          }`}>
+                            {entry.itemInfo?.type}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 font-semibold text-gray-800">
+                          {entry.itemInfo?.name}
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-gray-700 font-medium">
+                          {entry.mnVal > 0 ? entry.mnVal.toFixed(2) : '-'}
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-gray-600 font-semibold">
+                          {entry.msVal.toFixed(2)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-gray-700 font-bold">
+                          {percentage}%
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-medium text-emerald-800 bg-emerald-50/20 border-l border-emerald-100">
+                          {entry.priceKg > 0 ? `R$ ${entry.priceKg.toFixed(2)}` : '-'}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-bold text-emerald-900 bg-emerald-50/20">
+                          {entry.dailyCost > 0 ? `R$ ${entry.dailyCost.toFixed(2)}` : '-'}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
 
           {/* Consolidated Nutrients Cards */}
-          <div className="mb-2">
+          <div className="mb-6">
             <div className="flex justify-between items-center mb-4">
               <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                 Nutrientes Consolidados da Dieta Ajustada (Concentrado + Volumoso)
@@ -263,6 +299,60 @@ export default function AdjustedDietSummary({ data, onGoToReport }: Props) {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Card Resumo Financeiro da Dieta */}
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50/40 to-emerald-50/20 border border-emerald-200">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3 pb-2 border-b border-emerald-200/60">
+              <span className="text-xs font-black uppercase text-emerald-900 tracking-wider">
+                Indicadores Financeiros e Projeção do Lote
+              </span>
+              <span className="text-xs text-emerald-800 font-semibold bg-white/80 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                Lote: <strong>{animais} {animais === 1 ? 'animal' : 'animais'}</strong> • Período: <strong>{days} {days === 1 ? 'dia' : 'dias'}</strong>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-center">
+              <div className="bg-white/95 p-3 rounded-xl border border-emerald-100 shadow-2xs">
+                <span className="text-[10px] font-bold text-gray-500 uppercase block">Custo / Animal / Dia</span>
+                <div className="text-xl font-black text-emerald-800">
+                  {totalDietDailyCost > 0 ? `R$ ${totalDietDailyCost.toFixed(2)}` : 'R$ 0,00'}
+                </div>
+                <span className="text-[10px] text-gray-500 block mt-0.5">
+                  Conc: R$ {totalConcDailyCost.toFixed(2)} | Vol: R$ {totalVolDailyCost.toFixed(2)}
+                </span>
+              </div>
+
+              <div className="bg-white/95 p-3 rounded-xl border border-emerald-100 shadow-2xs">
+                <span className="text-[10px] font-bold text-gray-500 uppercase block">Gasto por Animal ({days} d)</span>
+                <div className="text-xl font-black text-emerald-800">
+                  {totalDietDailyCost > 0 ? `R$ ${(totalDietDailyCost * days).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'R$ 0,00'}
+                </div>
+                <span className="text-[10px] text-gray-500 block mt-0.5">
+                  Período completo
+                </span>
+              </div>
+
+              <div className="bg-white/95 p-3 rounded-xl border border-emerald-100 shadow-2xs">
+                <span className="text-[10px] font-bold text-gray-500 uppercase block">Custo Diário Rebanho</span>
+                <div className="text-xl font-black text-emerald-900">
+                  {totalLoteDailyCost > 0 ? `R$ ${totalLoteDailyCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'R$ 0,00'}
+                </div>
+                <span className="text-[10px] text-gray-500 block mt-0.5">
+                  {animais} {animais === 1 ? 'cabeça' : 'cabeças'}
+                </span>
+              </div>
+
+              <div className="bg-emerald-700 text-white p-3 rounded-xl border border-emerald-800 shadow-2xs">
+                <span className="text-[10px] font-bold text-emerald-100 uppercase block">Investimento Total Lote</span>
+                <div className="text-xl font-black text-amber-300">
+                  {totalLotePeriodCost > 0 ? `R$ ${totalLotePeriodCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'R$ 0,00'}
+                </div>
+                <span className="text-[10px] text-emerald-100 block mt-0.5">
+                  {animais} cab. × {days} d
+                </span>
+              </div>
             </div>
           </div>
         </div>

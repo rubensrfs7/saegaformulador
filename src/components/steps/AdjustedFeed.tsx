@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Plus, Trash2, Copy, Sparkles, Scale, SlidersHorizontal, Info, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Copy, Sparkles, Scale, SlidersHorizontal, Info, RefreshCw, FlaskConical } from 'lucide-react';
 import { FormulationState, IngredientEntry } from '../../types';
 import { MOCK_INGREDIENTS, CONSUMPTION_TARGETS } from '../../data';
+import SearchableIngredientSelect from '../common/SearchableIngredientSelect';
 
 interface Props {
   data: FormulationState;
@@ -15,6 +16,8 @@ export default function AdjustedFeed({ data, updateData }: Props) {
     t => t.category === data.category && t.subcategory === data.subcategory
   );
   const weight = Number(data.weight) || 0;
+  const animais = Number(data.quantity) || 1;
+  const days = Number(data.days) || 1;
   
   // Metas do Perfil do Animal (Etapa 1)
   const metaCMS = currentTarget ? weight * (currentTarget.percentPvMs / 100) : weight * 0.03;
@@ -32,7 +35,8 @@ export default function AdjustedFeed({ data, updateData }: Props) {
       ingredientId: defaultIngredient.id,
       type,
       mn: '',
-      ms: ''
+      ms: '',
+      pricePerKg: ''
     };
     updateData({
       adjustedConcentrates: [...data.adjustedConcentrates, newEntry]
@@ -60,6 +64,8 @@ export default function AdjustedFeed({ data, updateData }: Props) {
         } else if (field === 'ingredientId') {
           const mn = Number(c.mn) || 0;
           updated.ms = c.mn === '' ? '' : mn * (itemInfo.msPercent / 100);
+        } else if (field === 'pricePerKg') {
+          updated.pricePerKg = value === '' ? '' : Number(value);
         }
         return updated;
       })
@@ -74,7 +80,8 @@ export default function AdjustedFeed({ data, updateData }: Props) {
       ingredientId: defaultVol.id,
       type: 'Volumoso',
       mn: '',
-      ms: ''
+      ms: '',
+      pricePerKg: ''
     };
     updateData({
       adjustedVolumosos: [...data.adjustedVolumosos, newEntry]
@@ -102,6 +109,8 @@ export default function AdjustedFeed({ data, updateData }: Props) {
         } else if (field === 'ingredientId') {
           const mn = Number(v.mn) || 0;
           updated.ms = v.mn === '' ? '' : mn * (itemInfo.msPercent / 100);
+        } else if (field === 'pricePerKg') {
+          updated.pricePerKg = value === '' ? '' : Number(value);
         }
         return updated;
       })
@@ -112,11 +121,13 @@ export default function AdjustedFeed({ data, updateData }: Props) {
   const copyFromCurrentDiet = () => {
     const copiedConc = data.currentConcentrates.map(c => ({
       ...c,
-      id: Math.random().toString(36).substring(7)
+      id: Math.random().toString(36).substring(7),
+      pricePerKg: c.pricePerKg !== undefined ? c.pricePerKg : ''
     }));
     const copiedVol = data.currentVolumosos.map(v => ({
       ...v,
-      id: Math.random().toString(36).substring(7)
+      id: Math.random().toString(36).substring(7),
+      pricePerKg: v.pricePerKg !== undefined ? v.pricePerKg : ''
     }));
     updateData({
       adjustedConcentrates: copiedConc,
@@ -127,6 +138,7 @@ export default function AdjustedFeed({ data, updateData }: Props) {
   // Resolução dos dados do Concentrado
   let concMN = 0;
   let concMS = 0;
+  let concCostTotal = 0;
   let concPB = 0;
   let concNDT = 0;
   let concFDN = 0;
@@ -139,15 +151,18 @@ export default function AdjustedFeed({ data, updateData }: Props) {
     if (!itemInfo) return null;
     const mnVal = Number(entry.mn) || 0;
     const msVal = entry.mn === '' ? 0 : mnVal * (itemInfo.msPercent / 100);
+    const priceKg = entry.pricePerKg !== undefined && entry.pricePerKg !== '' ? Number(entry.pricePerKg) : 0;
+    const itemCostTotal = mnVal * priceKg;
     concMN += mnVal;
     concMS += msVal;
+    concCostTotal += itemCostTotal;
     concPB += msVal * itemInfo.pb;
     concNDT += msVal * itemInfo.ndt;
     concFDN += msVal * itemInfo.fdn;
     concAmido += msVal * itemInfo.amido;
     concCalcio += msVal * itemInfo.calcio;
     concFosforo += msVal * itemInfo.fosforo;
-    return { ...entry, itemInfo, mnVal, msVal };
+    return { ...entry, itemInfo, mnVal, msVal, priceKg, itemCostTotal };
   }).filter(Boolean);
 
   // Concentrado: % MS média da mistura e cálculo do consumo diário do animal
@@ -157,6 +172,7 @@ export default function AdjustedFeed({ data, updateData }: Props) {
   // Resolução dos dados do Volumoso
   let volMN = 0;
   let volMS = 0;
+  let volCostTotal = 0;
   let volPB = 0;
   let volNDT = 0;
   let volFDN = 0;
@@ -169,20 +185,42 @@ export default function AdjustedFeed({ data, updateData }: Props) {
     if (!itemInfo) return null;
     const mnVal = Number(entry.mn) || 0;
     const msVal = entry.mn === '' ? 0 : mnVal * (itemInfo.msPercent / 100);
+    const priceKg = entry.pricePerKg !== undefined && entry.pricePerKg !== '' ? Number(entry.pricePerKg) : 0;
+    const itemCostTotal = mnVal * priceKg;
     volMN += mnVal;
     volMS += msVal;
+    volCostTotal += itemCostTotal;
     volPB += msVal * itemInfo.pb;
     volNDT += msVal * itemInfo.ndt;
     volFDN += msVal * itemInfo.fdn;
     volAmido += msVal * itemInfo.amido;
     volCalcio += msVal * itemInfo.calcio;
     volFosforo += msVal * itemInfo.fosforo;
-    return { ...entry, itemInfo, mnVal, msVal };
+    return { ...entry, itemInfo, mnVal, msVal, priceKg, itemCostTotal };
   }).filter(Boolean);
 
   // Volumoso: % MS média da mistura e cálculo do consumo diário do animal
   const avgVolMSPercent = volMN > 0 ? (volMS / volMN) : 0;
   const animalVolDailyMN = avgVolMSPercent > 0 ? metaVolumosoMS / avgVolMSPercent : 0;
+
+  // Custos por Animal/Dia (R$/animal/dia)
+  const animalConcDailyCost = resolvedConc.reduce((acc, entry) => {
+    if (!entry) return acc;
+    const pct = concMN > 0 ? (entry.mnVal / concMN) : 0;
+    const animalDailyMN = pct * animalConcDailyMN;
+    return acc + (animalDailyMN * entry.priceKg);
+  }, 0);
+
+  const animalVolDailyCost = resolvedVol.reduce((acc, entry) => {
+    if (!entry) return acc;
+    const pct = volMN > 0 ? (entry.mnVal / volMN) : 0;
+    const animalDailyMN = pct * animalVolDailyMN;
+    return acc + (animalDailyMN * entry.priceKg);
+  }, 0);
+
+  const totalAnimalDailyCost = animalConcDailyCost + animalVolDailyCost;
+  const totalLoteDailyCost = totalAnimalDailyCost * animais;
+  const totalLotePeriodCost = totalLoteDailyCost * days;
 
   // Nutrientes exclusivos do Concentrado (calculados sobre a MS do concentrado)
   const concNutrientCards = [
@@ -295,7 +333,7 @@ export default function AdjustedFeed({ data, updateData }: Props) {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div className="flex-1 min-w-0">
             <div className="inline-flex items-center gap-2 bg-purple-50 text-purple-700 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full mb-2">
-              <SlidersHorizontal size={14} /> Fase 4: Formulação & Ajuste Nutricional
+              <FlaskConical size={14} /> Fase 4: Formulação & Ajuste Nutricional
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-gray-800">Concentrado e Volumoso Ajustado</h2>
             <p className="text-gray-500 text-xs mt-1 max-w-2xl leading-relaxed">
@@ -414,101 +452,156 @@ export default function AdjustedFeed({ data, updateData }: Props) {
           </div>
 
           {/* Table */}
-          <div className="border border-gray-100 rounded-xl overflow-hidden mb-6">
-            <div className="grid grid-cols-12 gap-3 pb-3 pt-3 bg-gray-50/80 border-b border-gray-200 text-xs font-bold text-gray-500 px-4 uppercase">
-              <div className="col-span-2">Tipo</div>
-              <div className="col-span-3">Insumo</div>
-              <div className="col-span-2">MN Digitado (kg)</div>
-              <div className="col-span-2">MS Mistura (kg)</div>
-              <div className="col-span-1">% Mistura</div>
-              <div className="col-span-1">Consumo/Dia</div>
-              <div className="col-span-1 text-center">Ações</div>
-            </div>
+          <div className="border border-gray-100 rounded-xl overflow-hidden mb-6 overflow-x-auto shadow-2xs">
+            <table className="w-full text-left border-collapse min-w-[760px]">
+              <thead>
+                <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                  <th className="py-3 px-3 w-28">Tipo</th>
+                  <th className="py-3 px-3">Insumo</th>
+                  <th className="py-3 px-3 w-32">MN Batida (kg)</th>
+                  <th className="py-3 px-3 w-24">MS (kg)</th>
+                  <th className="py-3 px-3 w-20">% Mistura</th>
+                  <th className="py-3 px-3 w-24">Consumo/Dia</th>
+                  <th className="py-3 px-3 w-32 bg-emerald-50/60 text-emerald-900 border-l border-emerald-100">
+                    Preço (R$/kg)
+                  </th>
+                  <th className="py-3 px-3 w-32 bg-emerald-50/60 text-emerald-900">
+                    Total (R$)
+                  </th>
+                  <th className="py-3 px-2 w-12 text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-sm">
+                {resolvedConc.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="text-center text-gray-400 py-8 text-sm">
+                      Nenhum concentrado ou mineral adicionado. Clique nos botões acima para incluir insumos.
+                    </td>
+                  </tr>
+                ) : (
+                  resolvedConc.map(entry => {
+                    if (!entry) return null;
+                    const pct = concMN > 0 ? (entry.mnVal / concMN) * 100 : 0;
+                    const animalDailyMN = (pct / 100) * animalConcDailyMN;
+                    const animalDailyCost = animalDailyMN * entry.priceKg;
 
-            <div className="divide-y divide-gray-100 min-h-[90px]">
-              {resolvedConc.length === 0 ? (
-                <div className="text-center text-gray-400 py-8 text-sm">
-                  Nenhum concentrado ou mineral adicionado. Clique nos botões acima para incluir insumos.
-                </div>
-              ) : (
-                resolvedConc.map(entry => {
-                  if (!entry) return null;
-                  const pct = concMN > 0 ? (entry.mnVal / concMN) * 100 : 0;
-                  const animalDailyMN = (pct / 100) * animalConcDailyMN;
-                  return (
-                    <div key={entry.id} className="grid grid-cols-12 gap-3 items-center text-sm px-4 py-3 hover:bg-orange-50/20 transition-colors">
-                      <div className="col-span-2">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border ${
-                          entry.type === 'Concentrado' ? 'bg-orange-50 text-orange-600 border-orange-200' : 
-                          'bg-slate-50 text-slate-600 border-slate-200'
-                        }`}>
-                          {entry.type}
-                        </span>
-                      </div>
-                      <div className="col-span-3">
-                        <select 
-                          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
-                          value={entry.ingredientId}
-                          onChange={(e) => updateConcentrate(entry.id, 'ingredientId', e.target.value)}
-                        >
-                          {MOCK_INGREDIENTS.filter(i => i.type === entry.type).map(i => (
-                            <option key={i.id} value={i.id}>{i.name} ({i.msPercent}% MS)</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="col-span-2">
-                        <input 
-                          type="number" 
-                          step="0.01"
-                          placeholder="0.00"
-                          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-semibold text-gray-800"
-                          value={entry.mn}
-                          onChange={(e) => updateConcentrate(entry.id, 'mn', e.target.value)}
-                        />
-                      </div>
-                      <div className="col-span-2 text-gray-600 font-semibold px-1">
-                        {entry.msVal > 0 ? `${entry.msVal.toFixed(2)} kg` : '-'}
-                      </div>
-                      <div className="col-span-1 text-gray-700 font-bold px-1">
-                        {pct.toFixed(1)}%
-                      </div>
-                      <div className="col-span-1 text-orange-700 font-bold text-xs px-1" title="Consumo calculado para a meta do animal">
-                        {animalDailyMN > 0 ? `${animalDailyMN.toFixed(2)} kg` : '-'}
-                      </div>
-                      <div className="col-span-1 flex justify-center">
-                        <button 
-                          type="button"
-                          onClick={() => removeConcentrate(entry.id)}
-                          className="text-gray-400 hover:text-red-600 transition p-1.5 rounded-lg hover:bg-red-50 cursor-pointer"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+                    return (
+                      <tr key={entry.id} className="hover:bg-orange-50/20 transition-colors">
+                        <td className="py-2.5 px-3">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border ${
+                            entry.type === 'Concentrado' ? 'bg-orange-50 text-orange-600 border-orange-200' : 
+                            'bg-slate-50 text-slate-600 border-slate-200'
+                          }`}>
+                            {entry.type}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 min-w-[220px]">
+                          <SearchableIngredientSelect
+                            value={entry.ingredientId}
+                            onChange={(newId) => updateConcentrate(entry.id, 'ingredientId', newId)}
+                            ingredients={MOCK_INGREDIENTS.filter(i => i.type === entry.type)}
+                            theme="orange"
+                            placeholder="Buscar insumo..."
+                          />
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <input 
+                            type="number" 
+                            step="0.01"
+                            placeholder="0.00"
+                            className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-semibold text-gray-800"
+                            value={entry.mn}
+                            onChange={(e) => updateConcentrate(entry.id, 'mn', e.target.value)}
+                          />
+                        </td>
+                        <td className="py-2.5 px-3 text-gray-600 font-semibold text-xs sm:text-sm">
+                          {entry.msVal > 0 ? `${entry.msVal.toFixed(2)} kg` : '-'}
+                        </td>
+                        <td className="py-2.5 px-3 text-gray-700 font-bold text-xs sm:text-sm">
+                          {pct.toFixed(1)}%
+                        </td>
+                        <td className="py-2.5 px-3 text-orange-700 font-bold text-xs" title="Consumo calculado para a meta do animal">
+                          {animalDailyMN > 0 ? `${animalDailyMN.toFixed(2)} kg` : '-'}
+                        </td>
+                        <td className="py-2.5 px-3 bg-emerald-50/20 border-l border-emerald-100">
+                          <div className="relative rounded-lg">
+                            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2 text-xs font-bold text-emerald-700">
+                              R$
+                            </span>
+                            <input 
+                              type="number" 
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              className="w-full border border-emerald-200 rounded-lg pl-7 pr-2 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-900 bg-white"
+                              value={entry.pricePerKg ?? ''}
+                              onChange={(e) => updateConcentrate(entry.id, 'pricePerKg', e.target.value)}
+                            />
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 bg-emerald-50/20">
+                          <div className="font-black text-emerald-800 text-xs sm:text-sm">
+                            {entry.itemCostTotal > 0 ? `R$ ${entry.itemCostTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                          </div>
+                          {animalDailyCost > 0 && (
+                            <div className="text-[10px] text-emerald-700 font-semibold" title="Custo diário por animal">
+                              R$ {animalDailyCost.toFixed(2)}/cab/dia
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-2 text-center">
+                          <button 
+                            type="button"
+                            onClick={() => removeConcentrate(entry.id)}
+                            className="text-gray-400 hover:text-red-600 transition p-1.5 rounded-lg hover:bg-red-50 cursor-pointer"
+                            title="Remover insumo"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
 
           {/* Subtotal Concentrado */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-[#fff8eb] border border-orange-100 rounded-xl px-5 py-3 mb-6 gap-3">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-[#fff8eb] border border-orange-100 rounded-xl px-5 py-3.5 mb-6 gap-3">
             <div>
               <span className="text-xs font-bold text-orange-900 uppercase tracking-wide block">
                 Subtotal da Mistura de Concentrado
               </span>
               <span className="text-xs text-orange-700 font-medium">
-                Meta do animal atendida: <strong>{metaConcentradoMS.toFixed(2)} kg MS/dia</strong> ({animalConcDailyMN.toFixed(2)} kg MN/dia)
+                Meta atendida: <strong>{metaConcentradoMS.toFixed(2)} kg MS/dia</strong> ({animalConcDailyMN.toFixed(2)} kg MN/dia)
               </span>
             </div>
-            <div className="flex gap-6 text-right">
+            <div className="flex flex-wrap gap-4 sm:gap-6 text-left sm:text-right">
               <div>
-                <span className="text-[10px] font-bold text-orange-600 uppercase block">Total Digitado na Batida</span>
-                <span className="text-base font-black text-orange-800">{concMN.toFixed(2)} kg MN</span>
+                <span className="text-[10px] font-bold text-orange-600 uppercase block">Total Batida</span>
+                <span className="text-sm sm:text-base font-black text-orange-800">{concMN.toFixed(2)} kg MN</span>
               </div>
               <div>
                 <span className="text-[10px] font-bold text-orange-600 uppercase block">MS da Batida</span>
-                <span className="text-base font-black text-orange-800">{concMS.toFixed(2)} kg MS</span>
+                <span className="text-sm sm:text-base font-black text-orange-800">{concMS.toFixed(2)} kg MS</span>
+              </div>
+              <div className="border-l border-orange-200 pl-4 sm:pl-6">
+                <span className="text-[10px] font-bold text-emerald-700 uppercase block">Valor Total Batida</span>
+                <span className="text-sm sm:text-base font-black text-emerald-800">
+                  {concCostTotal > 0 ? `R$ ${concCostTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                </span>
+                {concMN > 0 && concCostTotal > 0 && (
+                  <span className="text-[10px] text-emerald-700 font-medium block">
+                    Médio: R$ {(concCostTotal / concMN).toFixed(2)}/kg
+                  </span>
+                )}
+              </div>
+              <div className="border-l border-orange-200 pl-4 sm:pl-6">
+                <span className="text-[10px] font-bold text-emerald-700 uppercase block">Custo p/ Animal</span>
+                <span className="text-sm sm:text-base font-black text-emerald-800">
+                  {animalConcDailyCost > 0 ? `R$ ${animalConcDailyCost.toFixed(2)}/dia` : '-'}
+                </span>
               </div>
             </div>
           </div>
@@ -561,98 +654,153 @@ export default function AdjustedFeed({ data, updateData }: Props) {
           </div>
 
           {/* Table */}
-          <div className="border border-gray-100 rounded-xl overflow-hidden mb-6">
-            <div className="grid grid-cols-12 gap-3 pb-3 pt-3 bg-gray-50/80 border-b border-gray-200 text-xs font-bold text-gray-500 px-4 uppercase">
-              <div className="col-span-2">Tipo</div>
-              <div className="col-span-3">Insumo</div>
-              <div className="col-span-2">MN Digitado (kg)</div>
-              <div className="col-span-2">MS Mistura (kg)</div>
-              <div className="col-span-1">% Mistura</div>
-              <div className="col-span-1">Consumo/Dia</div>
-              <div className="col-span-1 text-center">Ações</div>
-            </div>
+          <div className="border border-gray-100 rounded-xl overflow-hidden mb-6 overflow-x-auto shadow-2xs">
+            <table className="w-full text-left border-collapse min-w-[760px]">
+              <thead>
+                <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                  <th className="py-3 px-3 w-28">Tipo</th>
+                  <th className="py-3 px-3">Insumo</th>
+                  <th className="py-3 px-3 w-32">MN Batida (kg)</th>
+                  <th className="py-3 px-3 w-24">MS (kg)</th>
+                  <th className="py-3 px-3 w-20">% Mistura</th>
+                  <th className="py-3 px-3 w-24">Consumo/Dia</th>
+                  <th className="py-3 px-3 w-32 bg-emerald-50/60 text-emerald-900 border-l border-emerald-100">
+                    Preço (R$/kg)
+                  </th>
+                  <th className="py-3 px-3 w-32 bg-emerald-50/60 text-emerald-900">
+                    Total (R$)
+                  </th>
+                  <th className="py-3 px-2 w-12 text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-sm">
+                {resolvedVol.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="text-center text-gray-400 py-8 text-sm">
+                      Nenhum volumoso adicionado. Clique no botão acima para incluir volumosos.
+                    </td>
+                  </tr>
+                ) : (
+                  resolvedVol.map(entry => {
+                    if (!entry) return null;
+                    const pct = volMN > 0 ? (entry.mnVal / volMN) * 100 : 0;
+                    const animalDailyMN = (pct / 100) * animalVolDailyMN;
+                    const animalDailyCost = animalDailyMN * entry.priceKg;
 
-            <div className="divide-y divide-gray-100 min-h-[90px]">
-              {resolvedVol.length === 0 ? (
-                <div className="text-center text-gray-400 py-8 text-sm">
-                  Nenhum volumoso adicionado. Clique no botão acima para incluir volumosos.
-                </div>
-              ) : (
-                resolvedVol.map(entry => {
-                  if (!entry) return null;
-                  const pct = volMN > 0 ? (entry.mnVal / volMN) * 100 : 0;
-                  const animalDailyMN = (pct / 100) * animalVolDailyMN;
-                  return (
-                    <div key={entry.id} className="grid grid-cols-12 gap-3 items-center text-sm px-4 py-3 hover:bg-green-50/20 transition-colors">
-                      <div className="col-span-2">
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border bg-green-50 text-green-700 border-green-200">
-                          Volumoso
-                        </span>
-                      </div>
-                      <div className="col-span-3">
-                        <select 
-                          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
-                          value={entry.ingredientId}
-                          onChange={(e) => updateVolumoso(entry.id, 'ingredientId', e.target.value)}
-                        >
-                          {MOCK_INGREDIENTS.filter(i => i.type === 'Volumoso').map(i => (
-                            <option key={i.id} value={i.id}>{i.name} ({i.msPercent}% MS)</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="col-span-2">
-                        <input 
-                          type="number" 
-                          step="0.01"
-                          placeholder="0.00"
-                          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 font-semibold text-gray-800"
-                          value={entry.mn}
-                          onChange={(e) => updateVolumoso(entry.id, 'mn', e.target.value)}
-                        />
-                      </div>
-                      <div className="col-span-2 text-gray-600 font-semibold px-1">
-                        {entry.msVal > 0 ? `${entry.msVal.toFixed(2)} kg` : '-'}
-                      </div>
-                      <div className="col-span-1 text-gray-700 font-bold px-1">
-                        {pct.toFixed(1)}%
-                      </div>
-                      <div className="col-span-1 text-green-700 font-bold text-xs px-1" title="Consumo calculado para a meta do animal">
-                        {animalDailyMN > 0 ? `${animalDailyMN.toFixed(2)} kg` : '-'}
-                      </div>
-                      <div className="col-span-1 flex justify-center">
-                        <button 
-                          type="button"
-                          onClick={() => removeVolumoso(entry.id)}
-                          className="text-gray-400 hover:text-red-600 transition p-1.5 rounded-lg hover:bg-red-50 cursor-pointer"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+                    return (
+                      <tr key={entry.id} className="hover:bg-green-50/20 transition-colors">
+                        <td className="py-2.5 px-3">
+                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border bg-green-50 text-green-700 border-green-200">
+                            Volumoso
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 min-w-[220px]">
+                          <SearchableIngredientSelect
+                            value={entry.ingredientId}
+                            onChange={(newId) => updateVolumoso(entry.id, 'ingredientId', newId)}
+                            ingredients={MOCK_INGREDIENTS.filter(i => i.type === 'Volumoso')}
+                            theme="green"
+                            placeholder="Buscar volumoso..."
+                          />
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <input 
+                            type="number" 
+                            step="0.01"
+                            placeholder="0.00"
+                            className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-green-500 font-semibold text-gray-800"
+                            value={entry.mn}
+                            onChange={(e) => updateVolumoso(entry.id, 'mn', e.target.value)}
+                          />
+                        </td>
+                        <td className="py-2.5 px-3 text-gray-600 font-semibold text-xs sm:text-sm">
+                          {entry.msVal > 0 ? `${entry.msVal.toFixed(2)} kg` : '-'}
+                        </td>
+                        <td className="py-2.5 px-3 text-gray-700 font-bold text-xs sm:text-sm">
+                          {pct.toFixed(1)}%
+                        </td>
+                        <td className="py-2.5 px-3 text-green-700 font-bold text-xs" title="Consumo calculado para a meta do animal">
+                          {animalDailyMN > 0 ? `${animalDailyMN.toFixed(2)} kg` : '-'}
+                        </td>
+                        <td className="py-2.5 px-3 bg-emerald-50/20 border-l border-emerald-100">
+                          <div className="relative rounded-lg">
+                            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2 text-xs font-bold text-emerald-700">
+                              R$
+                            </span>
+                            <input 
+                              type="number" 
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              className="w-full border border-emerald-200 rounded-lg pl-7 pr-2 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-900 bg-white"
+                              value={entry.pricePerKg ?? ''}
+                              onChange={(e) => updateVolumoso(entry.id, 'pricePerKg', e.target.value)}
+                            />
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 bg-emerald-50/20">
+                          <div className="font-black text-emerald-800 text-xs sm:text-sm">
+                            {entry.itemCostTotal > 0 ? `R$ ${entry.itemCostTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                          </div>
+                          {animalDailyCost > 0 && (
+                            <div className="text-[10px] text-emerald-700 font-semibold" title="Custo diário por animal">
+                              R$ {animalDailyCost.toFixed(2)}/cab/dia
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-2 text-center">
+                          <button 
+                            type="button"
+                            onClick={() => removeVolumoso(entry.id)}
+                            className="text-gray-400 hover:text-red-600 transition p-1.5 rounded-lg hover:bg-red-50 cursor-pointer"
+                            title="Remover insumo"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
 
           {/* Subtotal Volumoso */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-[#ecfdf3] border border-green-100 rounded-xl px-5 py-3 mb-6 gap-3">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-[#ecfdf3] border border-green-100 rounded-xl px-5 py-3.5 mb-6 gap-3">
             <div>
               <span className="text-xs font-bold text-green-700 uppercase tracking-wide block">
                 Subtotal da Mistura de Volumoso
               </span>
               <span className="text-xs text-green-700 font-medium">
-                Meta do animal atendida: <strong>{metaVolumosoMS.toFixed(2)} kg MS/dia</strong> ({animalVolDailyMN.toFixed(2)} kg MN/dia)
+                Meta atendida: <strong>{metaVolumosoMS.toFixed(2)} kg MS/dia</strong> ({animalVolDailyMN.toFixed(2)} kg MN/dia)
               </span>
             </div>
-            <div className="flex gap-6 text-right">
+            <div className="flex flex-wrap gap-4 sm:gap-6 text-left sm:text-right">
               <div>
-                <span className="text-[10px] font-bold text-green-600 uppercase block">Total Digitado na Batida</span>
-                <span className="text-base font-black text-green-800">{volMN.toFixed(2)} kg MN</span>
+                <span className="text-[10px] font-bold text-green-600 uppercase block">Total Batida</span>
+                <span className="text-sm sm:text-base font-black text-green-800">{volMN.toFixed(2)} kg MN</span>
               </div>
               <div>
                 <span className="text-[10px] font-bold text-green-600 uppercase block">MS da Batida</span>
-                <span className="text-base font-black text-green-800">{volMS.toFixed(2)} kg MS</span>
+                <span className="text-sm sm:text-base font-black text-green-800">{volMS.toFixed(2)} kg MS</span>
+              </div>
+              <div className="border-l border-green-200 pl-4 sm:pl-6">
+                <span className="text-[10px] font-bold text-emerald-700 uppercase block">Valor Total Batida</span>
+                <span className="text-sm sm:text-base font-black text-emerald-800">
+                  {volCostTotal > 0 ? `R$ ${volCostTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                </span>
+                {volMN > 0 && volCostTotal > 0 && (
+                  <span className="text-[10px] text-emerald-700 font-medium block">
+                    Médio: R$ {(volCostTotal / volMN).toFixed(2)}/kg
+                  </span>
+                )}
+              </div>
+              <div className="border-l border-green-200 pl-4 sm:pl-6">
+                <span className="text-[10px] font-bold text-emerald-700 uppercase block">Custo p/ Animal</span>
+                <span className="text-sm sm:text-base font-black text-emerald-800">
+                  {animalVolDailyCost > 0 ? `R$ ${animalVolDailyCost.toFixed(2)}/dia` : '-'}
+                </span>
               </div>
             </div>
           </div>
@@ -681,33 +829,108 @@ export default function AdjustedFeed({ data, updateData }: Props) {
       </div>
 
       {/* Resumo da Batida e Consumo Individual */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
-        <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">
-          Resumo da Mistura Formulada e Consumo por Animal
-        </h4>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 space-y-6">
+        <div>
+          <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">
+            Resumo da Mistura Formulada e Consumo por Animal
+          </h4>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          <div className="p-5 rounded-xl bg-orange-50/60 border border-orange-100">
-            <div className="text-[10px] font-bold text-orange-700 uppercase tracking-wider mb-1">
-              Mistura de Concentrado Cadastrada
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="p-5 rounded-xl bg-orange-50/60 border border-orange-100">
+              <div className="text-[10px] font-bold text-orange-700 uppercase tracking-wider mb-1">
+                Mistura de Concentrado Cadastrada
+              </div>
+              <div className="text-2xl font-black text-orange-900">
+                {concMN.toFixed(2)} <span className="text-sm font-semibold">kg MN na batida</span>
+              </div>
+              <div className="text-xs text-orange-700 mt-2 font-medium">
+                Consumo individual: <strong>{animalConcDailyMN.toFixed(2)} kg MN/dia</strong> ({metaConcentradoMS.toFixed(2)} kg MS)
+              </div>
+              {animalConcDailyCost > 0 && (
+                <div className="mt-2 pt-2 border-t border-orange-200/60 text-xs font-bold text-orange-900">
+                  Custo Concentrado: <strong>R$ {animalConcDailyCost.toFixed(2)} / animal / dia</strong>
+                </div>
+              )}
             </div>
-            <div className="text-2xl font-black text-orange-900">
-              {concMN.toFixed(2)} <span className="text-sm font-semibold">kg MN na batida</span>
+
+            <div className="p-5 rounded-xl bg-green-50/60 border border-green-100">
+              <div className="text-[10px] font-bold text-green-700 uppercase tracking-wider mb-1">
+                Mistura de Volumoso Cadastrada
+              </div>
+              <div className="text-2xl font-black text-green-900">
+                {volMN.toFixed(2)} <span className="text-sm font-semibold">kg MN na batida</span>
+              </div>
+              <div className="text-xs text-green-700 mt-2 font-medium">
+                Consumo individual: <strong>{animalVolDailyMN.toFixed(2)} kg MN/dia</strong> ({metaVolumosoMS.toFixed(2)} kg MS)
+              </div>
+              {animalVolDailyCost > 0 && (
+                <div className="mt-2 pt-2 border-t border-green-200/60 text-xs font-bold text-green-900">
+                  Custo Volumoso: <strong>R$ {animalVolDailyCost.toFixed(2)} / animal / dia</strong>
+                </div>
+              )}
             </div>
-            <div className="text-xs text-orange-700 mt-2 font-medium">
-              Consumo individual: <strong>{animalConcDailyMN.toFixed(2)} kg MN/dia</strong> ({metaConcentradoMS.toFixed(2)} kg MS)
+          </div>
+        </div>
+
+        {/* Card Destaque: Avaliação Financeira Geral */}
+        <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50/40 to-emerald-50/20 border-2 border-emerald-200 shadow-xs">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4 pb-3 border-b border-emerald-200">
+            <div>
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-800 bg-emerald-100/80 px-2.5 py-0.5 rounded-full">
+                Indicadores Financeiros da Dieta Ajustada
+              </span>
+              <h4 className="text-lg font-black text-emerald-950 mt-1">
+                Custo de Alimentação por Cabeça e Projeção do Lote
+              </h4>
+            </div>
+            <div className="text-xs text-emerald-800 font-semibold bg-white/80 px-3 py-1 rounded-lg border border-emerald-200">
+              Lote: <strong>{animais} {animais === 1 ? 'animal' : 'animais'}</strong> • Período: <strong>{days} {days === 1 ? 'dia' : 'dias'}</strong>
             </div>
           </div>
 
-          <div className="p-5 rounded-xl bg-green-50/60 border border-green-100">
-            <div className="text-[10px] font-bold text-green-700 uppercase tracking-wider mb-1">
-              Mistura de Volumoso Cadastrada
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white/95 p-4 rounded-xl border border-emerald-100 shadow-2xs">
+              <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Custo / Cabeça / Dia</span>
+              <div className="text-2xl font-black text-emerald-700">
+                {totalAnimalDailyCost > 0 ? `R$ ${totalAnimalDailyCost.toFixed(2)}` : 'R$ 0,00'}
+                <span className="text-xs font-medium text-gray-500 ml-1">/dia</span>
+              </div>
+              <div className="text-[11px] text-gray-500 mt-1">
+                Conc: R$ {animalConcDailyCost.toFixed(2)} + Vol: R$ {animalVolDailyCost.toFixed(2)}
+              </div>
             </div>
-            <div className="text-2xl font-black text-green-900">
-              {volMN.toFixed(2)} <span className="text-sm font-semibold">kg MN na batida</span>
+
+            <div className="bg-white/95 p-4 rounded-xl border border-emerald-100 shadow-2xs">
+              <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Gasto por Cabeça ({days} dias)</span>
+              <div className="text-2xl font-black text-emerald-800">
+                {totalAnimalDailyCost > 0 ? `R$ ${(totalAnimalDailyCost * days).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'R$ 0,00'}
+              </div>
+              <div className="text-[11px] text-gray-500 mt-1">
+                Custo total por animal no período
+              </div>
             </div>
-            <div className="text-xs text-green-700 mt-2 font-medium">
-              Consumo individual: <strong>{animalVolDailyMN.toFixed(2)} kg MN/dia</strong> ({metaVolumosoMS.toFixed(2)} kg MS)
+
+            <div className="bg-white/95 p-4 rounded-xl border border-emerald-100 shadow-2xs">
+              <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Custo Diário do Rebanho</span>
+              <div className="text-2xl font-black text-emerald-900">
+                {totalLoteDailyCost > 0 ? `R$ ${totalLoteDailyCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'R$ 0,00'}
+                <span className="text-xs font-medium text-gray-500 ml-1">/dia</span>
+              </div>
+              <div className="text-[11px] text-gray-500 mt-1">
+                Para alimentar {animais} {animais === 1 ? 'cabeça' : 'cabeças'}
+              </div>
+            </div>
+
+            <div className="bg-emerald-700 text-white p-4 rounded-xl shadow-xs border border-emerald-800">
+              <span className="text-[10px] font-bold text-emerald-100 uppercase tracking-wide block mb-1">
+                Investimento Total do Lote
+              </span>
+              <div className="text-2xl font-black text-amber-300">
+                {totalLotePeriodCost > 0 ? `R$ ${totalLotePeriodCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'R$ 0,00'}
+              </div>
+              <div className="text-[11px] text-emerald-100 mt-1">
+                {animais} cab. × {days} dias × R$ {totalAnimalDailyCost.toFixed(2)}/dia
+              </div>
             </div>
           </div>
         </div>
@@ -715,7 +938,7 @@ export default function AdjustedFeed({ data, updateData }: Props) {
         <div className="text-xs text-gray-500 bg-gray-50 p-4 rounded-xl border border-gray-200/60 flex items-center gap-2">
           <Info size={16} className="text-purple-600 shrink-0" />
           <span>
-            <strong>Lógica de Mistura:</strong> Você pode formular qualquer tamanho de batida no misturador (ex: 500 kg ou 1.000 kg). A porcentagem de cada insumo será automaticamente projetada para alimentar o lote atendendo exatamente a meta de <strong>{metaCMS.toFixed(2)} kg MS</strong> do animal.
+            <strong>Lógica de Mistura e Custos:</strong> Os preços por kg (R$/kg) digitados na batida são automaticamente multiplicados pela quantidade de insumo, projetados no consumo individual (R$/animal/dia) e multiplicados pelo número de animais (<strong>{animais} cab.</strong>) e período (<strong>{days} dias</strong>) para o relatório executivo.
           </span>
         </div>
       </div>

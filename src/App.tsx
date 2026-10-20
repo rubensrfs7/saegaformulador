@@ -7,8 +7,9 @@ import CurrentDietSummary from './components/steps/CurrentDietSummary';
 import AdjustedFeed from './components/steps/AdjustedFeed';
 import AdjustedDietSummary from './components/steps/AdjustedDietSummary';
 import Report from './components/steps/Report';
+import DatabaseView from './components/database/DatabaseView';
 import NavigationButtons from './components/NavigationButtons';
-import { FormulationState, Step } from './types';
+import { FormulationState, Step, ConsumptionTarget } from './types';
 
 const INITIAL_STATE: FormulationState = {
   name: '',
@@ -26,11 +27,22 @@ const INITIAL_STATE: FormulationState = {
 };
 
 export default function App() {
+  const [currentView, setCurrentView] = useState<'formulator' | 'database'>('formulator');
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [formulationData, setFormulationData] = useState<FormulationState>(INITIAL_STATE);
 
   const updateData = (data: Partial<FormulationState>) => {
     setFormulationData(prev => ({ ...prev, ...data }));
+  };
+
+  const handleSelectTargetFromDatabase = (target: ConsumptionTarget) => {
+    updateData({
+      category: target.category,
+      subcategory: target.subcategory,
+      weight: target.pvReferencia
+    });
+    setCurrentStep(1);
+    setCurrentView('formulator');
   };
 
   // Step 2 specific: "Não tenho dieta atual" -> skips directly to Step 4
@@ -57,21 +69,35 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans text-gray-800 pb-12">
-      <Header />
+      <Header 
+        activeView={currentView}
+        onSelectView={setCurrentView}
+      />
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 pt-8">
-        <Stepper currentStep={currentStep} onStepClick={handleStepClick} />
-        
-        <div className="mt-8">
-          {/* FASE 1: PERFIL DO ANIMAL */}
-          {currentStep === 1 && (
-            <>
-              <AnimalProfile data={formulationData} updateData={updateData} />
-              <NavigationButtons 
-                onNext={() => setCurrentStep(2)} 
-                nextLabel="Avançar para Dieta Atual"
-              />
-            </>
-          )}
+        {currentView === 'database' ? (
+          <DatabaseView
+            onBackToFormulator={() => setCurrentView('formulator')}
+            onSelectTargetForFormulation={handleSelectTargetFromDatabase}
+          />
+        ) : (
+          <>
+            <Stepper currentStep={currentStep} onStepClick={handleStepClick} />
+            
+            <div className="mt-8">
+              {/* FASE 1: PERFIL DO ANIMAL */}
+              {currentStep === 1 && (
+                <>
+                  <AnimalProfile 
+                    data={formulationData} 
+                    updateData={updateData} 
+                    onOpenDatabase={() => setCurrentView('database')}
+                  />
+                  <NavigationButtons 
+                    onNext={() => setCurrentStep(2)} 
+                    nextLabel="Avançar para Dieta Atual"
+                  />
+                </>
+              )}
 
           {/* FASE 2: CONCENTRADO E VOLUMOSO ATUAL */}
           {currentStep === 2 && (
@@ -152,6 +178,8 @@ export default function App() {
             </>
           )}
         </div>
+          </>
+        )}
       </main>
     </div>
   );

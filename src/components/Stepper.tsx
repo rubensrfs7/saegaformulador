@@ -1,4 +1,5 @@
-import { Check, User, Utensils, BarChart3, Sliders, CheckCircle2, FileText } from 'lucide-react';
+import { Check, FlaskConical, FileText } from 'lucide-react';
+import CowIcon from './icons/CowIcon';
 import { Step } from '../types';
 
 interface StepperProps {
@@ -8,11 +9,11 @@ interface StepperProps {
 
 export default function Stepper({ currentStep, onStepClick }: StepperProps) {
   const steps: { label: string; shortLabel: string; step: Step; Icon: any }[] = [
-    { label: 'PERFIL DO ANIMAL', shortLabel: 'PERFIL', step: 1, Icon: User },
-    { label: 'CONC. E VOL. ATUAL', shortLabel: 'ATUAL', step: 2, Icon: Utensils },
-    { label: 'DIETA ATUAL', shortLabel: 'RESUMO ATUAL', step: 3, Icon: BarChart3 },
-    { label: 'CONC. E VOL. AJUSTADO', shortLabel: 'AJUSTE', step: 4, Icon: Sliders },
-    { label: 'DIETA AJUSTADA', shortLabel: 'RESUMO FINAL', step: 5, Icon: CheckCircle2 },
+    { label: 'PERFIL DO ANIMAL', shortLabel: 'PERFIL', step: 1, Icon: CowIcon },
+    { label: 'CONC. E VOL. ATUAL', shortLabel: 'ATUAL', step: 2, Icon: FlaskConical },
+    { label: 'DIETA ATUAL', shortLabel: 'RESUMO ATUAL', step: 3, Icon: FlaskConical },
+    { label: 'CONC. E VOL. AJUSTADO', shortLabel: 'AJUSTE', step: 4, Icon: FlaskConical },
+    { label: 'DIETA AJUSTADA', shortLabel: 'RESUMO FINAL', step: 5, Icon: FlaskConical },
     { label: 'RELATÓRIO', shortLabel: 'RELATÓRIO', step: 6, Icon: FileText },
   ];
 
@@ -44,13 +45,18 @@ export default function Stepper({ currentStep, onStepClick }: StepperProps) {
               }`}
             >
               <div 
-                className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center border-2 transition-all shadow-sm
+                className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center border-2 transition-all shadow-sm relative
                   ${isCompleted ? 'bg-blue-700 border-blue-700 text-white' : 
                     isActive ? 'bg-blue-700 border-blue-700 text-white ring-4 ring-blue-100' : 
                     'bg-white border-gray-200 text-gray-400 group-hover:border-gray-300'}
                 `}
               >
-                {isCompleted ? <Check size={20} className="stroke-[2.5]" /> : <s.Icon size={18} />}
+                <s.Icon size={18} />
+                {isCompleted && (
+                  <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center shadow-xs">
+                    <Check size={10} className="text-white stroke-[3]" />
+                  </div>
+                )}
               </div>
               <span className={`text-[10px] sm:text-[11px] font-bold tracking-tight text-center leading-tight transition-colors ${
                 isActive ? 'text-blue-800' : isCompleted ? 'text-blue-700' : 'text-gray-400'
