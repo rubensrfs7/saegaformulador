@@ -58,19 +58,20 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
   };
 
   // 1. Raw Batches
-  const currConcRaw = resolveDietItems(data.currentConcentrates, 'Concentrado');
-  const currVolRaw = resolveDietItems(data.currentVolumosos, 'Volumoso');
+  // Se o usuário clicou em "Não tenho dieta atual", a dieta atual é ignorada no relatório
+  const currConcRaw = resolveDietItems(data.hasCurrentDiet ? data.currentConcentrates : [], 'Concentrado');
+  const currVolRaw = resolveDietItems(data.hasCurrentDiet ? data.currentVolumosos : [], 'Volumoso');
 
   const adjConcRaw = resolveDietItems(data.adjustedConcentrates, 'Concentrado');
   const adjVolRaw = resolveDietItems(data.adjustedVolumosos, 'Volumoso');
 
   // ================= DIETA ATUAL (REAL DA FAZENDA) =================
   // Quantidade fornecida por animal definida na Etapa 2
-  const currAnimalConcDailyMN = data.currentConcentradoKg !== undefined && data.currentConcentradoKg !== '' 
+  const currAnimalConcDailyMN = !data.hasCurrentDiet ? 0 : data.currentConcentradoKg !== undefined && data.currentConcentradoKg !== '' 
     ? Number(data.currentConcentradoKg) 
     : (currConcRaw.sumMN > 0 && currConcRaw.sumMN <= 25 ? currConcRaw.sumMN : 0);
 
-  const currAnimalVolDailyMN = data.currentVolumosoKg !== undefined && data.currentVolumosoKg !== '' 
+  const currAnimalVolDailyMN = !data.hasCurrentDiet ? 0 : data.currentVolumosoKg !== undefined && data.currentVolumosoKg !== '' 
     ? Number(data.currentVolumosoKg) 
     : (currVolRaw.sumMN > 0 && currVolRaw.sumMN <= 50 ? currVolRaw.sumMN : 0);
 
@@ -79,7 +80,10 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
     const mnVal = pct * currAnimalConcDailyMN;
     const msVal = mnVal * (item.itemInfo.msPercent / 100);
     const dailyCost = mnVal * item.priceKg;
-    return { ...item, mnVal, msVal, pct: pct * 100, batchMN: item.mnVal, dailyCost };
+    const lotDailyCost = dailyCost * animais;
+    const lotTotalPeriodCost = lotDailyCost * days;
+    const lotTotalPeriodKg = mnVal * animais * days;
+    return { ...item, mnVal, msVal, pct: pct * 100, batchMN: item.mnVal, dailyCost, lotDailyCost, lotTotalPeriodCost, lotTotalPeriodKg };
   });
 
   const currAnimalVolItems = currVolRaw.items.map(item => {
@@ -87,7 +91,10 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
     const mnVal = pct * currAnimalVolDailyMN;
     const msVal = mnVal * (item.itemInfo.msPercent / 100);
     const dailyCost = mnVal * item.priceKg;
-    return { ...item, mnVal, msVal, pct: pct * 100, batchMN: item.mnVal, dailyCost };
+    const lotDailyCost = dailyCost * animais;
+    const lotTotalPeriodCost = lotDailyCost * days;
+    const lotTotalPeriodKg = mnVal * animais * days;
+    return { ...item, mnVal, msVal, pct: pct * 100, batchMN: item.mnVal, dailyCost, lotDailyCost, lotTotalPeriodCost, lotTotalPeriodKg };
   });
 
   const currAnimalItems = [...currAnimalConcItems, ...currAnimalVolItems];
@@ -150,6 +157,25 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
   const adjLoteDailyCost = adjTotalCostDailyPerAnimal * animais;
   const adjLotePeriodCost = adjLoteDailyCost * days;
   const adjCostPerKgMS = adjTotalMS > 0 ? adjTotalCostDailyPerAnimal / adjTotalMS : 0;
+
+  // Planejamento financeiro (Pág. 3): usa a dieta ajustada; se não houver, usa a dieta atual (com os preços da Etapa 2)
+  const currTotalConcCostDaily = currAnimalConcItems.reduce((acc, i) => acc + i.dailyCost, 0);
+  const currTotalVolCostDaily = currAnimalVolItems.reduce((acc, i) => acc + i.dailyCost, 0);
+  const finAnimalConcItems = hasAdjustedDiet ? adjAnimalConcItems : currAnimalConcItems;
+  const finAnimalVolItems = hasAdjustedDiet ? adjAnimalVolItems : currAnimalVolItems;
+  const finAnimalConcDailyMN = hasAdjustedDiet ? adjAnimalConcDailyMN : currAnimalConcDailyMN;
+  const finAnimalVolDailyMN = hasAdjustedDiet ? adjAnimalVolDailyMN : currAnimalVolDailyMN;
+  const finConcRaw = hasAdjustedDiet ? adjConcRaw : currConcRaw;
+  const finVolRaw = hasAdjustedDiet ? adjVolRaw : currVolRaw;
+  const finTotalMN = hasAdjustedDiet ? adjTotalMN : currTotalMN;
+  const finTotalMS = hasAdjustedDiet ? adjTotalMS : currTotalMS;
+  const finTotalConcCostDaily = hasAdjustedDiet ? adjTotalConcCostDaily : currTotalConcCostDaily;
+  const finTotalVolCostDaily = hasAdjustedDiet ? adjTotalVolCostDaily : currTotalVolCostDaily;
+  const finTotalCostDailyPerAnimal = finTotalConcCostDaily + finTotalVolCostDaily;
+  const finCostPerAnimalPeriod = finTotalCostDailyPerAnimal * days;
+  const finLoteDailyCost = finTotalCostDailyPerAnimal * animais;
+  const finLotePeriodCost = finLoteDailyCost * days;
+  const finCostPerKgMS = finTotalMS > 0 ? finTotalCostDailyPerAnimal / finTotalMS : 0;
 
   let adjPB = 0, adjNDT = 0, adjFDN = 0, adjAmido = 0, adjCa = 0, adjP = 0;
   adjAnimalItems.forEach(c => {
@@ -657,7 +683,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
           {/* Header on page 2 */}
           <div className="flex justify-between items-end border-b-2 border-gray-200 pb-3 mb-6">
             <span className="text-xs font-bold text-blue-700 uppercase">SAEGA NUTRIÇÃO - {data.name || 'FÓRMULA'}</span>
-            <span className="text-xs text-gray-400 font-bold">PÁGINA 2 / 2</span>
+            <span className="text-xs text-gray-400 font-bold">PÁGINA 2 / 3</span>
           </div>
 
           {/* 5. DIETA DIÁRIA POR ANIMAL: COMPARATIVO LADO A LADO */}
@@ -929,13 +955,14 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                           {targetPct !== '-' ? `${targetPct}% (${nut.target} g/kg)` : '-'}
                         </td>
                         <td className="py-2.5 px-3 text-right font-bold border-l border-gray-200">
-                          {hasAdjustedDiet ? (
-                            <span className="inline-flex items-center gap-1 text-green-700">
-                              <CheckCircle2 size={12} /> Equilibrado
-                            </span>
-                          ) : (
-                            <span className="text-gray-500">Diagnóstico</span>
-                          )}
+                          {(() => {
+                            const val = hasAdjustedDiet ? nut.adjVal : nut.currVal;
+                            if (!nut.target) return <span className="text-gray-400">-</span>;
+                            if (val < nut.target * 0.90) return <span className="inline-flex items-center gap-1 text-red-500"><ArrowUp size={12} /> Abaixo</span>;
+                            if (val < nut.target * 0.98) return <span className="inline-flex items-center gap-1 text-amber-600"><ArrowUp size={12} /> Próximo</span>;
+                            if (val > nut.target * 1.10) return <span className="inline-flex items-center gap-1 text-blue-600"><ArrowDown size={12} /> Acima</span>;
+                            return <span className="inline-flex items-center gap-1 text-green-700"><CheckCircle2 size={12} /> Adequado</span>;
+                          })()}
                         </td>
                       </tr>
                     );
@@ -1051,7 +1078,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
           {/* Title of Section 8 */}
           <div className="text-center mb-6">
             <div className="text-xs font-bold text-emerald-700 tracking-widest uppercase mb-1">
-              Planejamento Econômico e Orçamento de Insumos
+              Planejamento Econômico e Orçamento de Insumos {hasAdjustedDiet ? '(Dieta Ajustada)' : '(Dieta Atual)'}
             </div>
             <h2 className="text-xl font-black text-gray-800 uppercase">
               Custos por Animal e Investimento Total do Lote ({animais} {animais === 1 ? 'Animal' : 'Animais'}, {days} {days === 1 ? 'Dia' : 'Dias'})
@@ -1063,17 +1090,17 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
             <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3.5 text-center">
               <span className="text-[10px] font-bold text-emerald-800 uppercase block mb-1">Gasto por Cabeça / Dia</span>
               <div className="text-xl font-black text-emerald-900">
-                {adjTotalCostDailyPerAnimal > 0 ? `R$ ${adjTotalCostDailyPerAnimal.toFixed(2)}` : 'R$ 0,00'}
+                {finTotalCostDailyPerAnimal > 0 ? `R$ ${finTotalCostDailyPerAnimal.toFixed(2)}` : 'R$ 0,00'}
               </div>
               <span className="text-[10px] text-emerald-700 font-medium block mt-0.5">
-                Conc: R$ {adjTotalConcCostDaily.toFixed(2)} | Vol: R$ {adjTotalVolCostDaily.toFixed(2)}
+                Conc: R$ {finTotalConcCostDaily.toFixed(2)} | Vol: R$ {finTotalVolCostDaily.toFixed(2)}
               </span>
             </div>
 
             <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3.5 text-center">
               <span className="text-[10px] font-bold text-emerald-800 uppercase block mb-1">Gasto por Cabeça ({days} d)</span>
               <div className="text-xl font-black text-emerald-900">
-                {adjCostPerAnimalPeriod > 0 ? `R$ ${adjCostPerAnimalPeriod.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'R$ 0,00'}
+                {finCostPerAnimalPeriod > 0 ? `R$ ${finCostPerAnimalPeriod.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'R$ 0,00'}
               </div>
               <span className="text-[10px] text-emerald-700 font-medium block mt-0.5">
                 Investimento por animal no período
@@ -1083,7 +1110,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
             <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3.5 text-center">
               <span className="text-[10px] font-bold text-emerald-800 uppercase block mb-1">Desembolso Diário Rebanho</span>
               <div className="text-xl font-black text-emerald-950">
-                {adjLoteDailyCost > 0 ? `R$ ${adjLoteDailyCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'R$ 0,00'}
+                {finLoteDailyCost > 0 ? `R$ ${finLoteDailyCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'R$ 0,00'}
               </div>
               <span className="text-[10px] text-emerald-700 font-medium block mt-0.5">
                 Para o lote de {animais} cabeças / dia
@@ -1095,7 +1122,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                 Investimento Total Lote
               </span>
               <div className="text-xl font-black text-amber-300">
-                {adjLotePeriodCost > 0 ? `R$ ${adjLotePeriodCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'R$ 0,00'}
+                {finLotePeriodCost > 0 ? `R$ ${finLotePeriodCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'R$ 0,00'}
               </div>
               <span className="text-[10px] text-emerald-100 font-medium block mt-0.5">
                 {animais} cab. × {days} dias
@@ -1107,10 +1134,10 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
           <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 mb-6 text-xs text-gray-700 flex flex-wrap justify-between items-center gap-2">
             <div>
               <span className="font-bold text-emerald-800">Fórmula de Multiplicação: </span>
-              <span>Gasto Diário por Animal (<strong>R$ {adjTotalCostDailyPerAnimal.toFixed(2)}</strong>) × <strong>{animais} {animais === 1 ? 'animal' : 'animais'}</strong> × <strong>{days} {days === 1 ? 'dia' : 'dias'}</strong></span>
+              <span>Gasto Diário por Animal (<strong>R$ {finTotalCostDailyPerAnimal.toFixed(2)}</strong>) × <strong>{animais} {animais === 1 ? 'animal' : 'animais'}</strong> × <strong>{days} {days === 1 ? 'dia' : 'dias'}</strong></span>
             </div>
             <div className="font-bold text-emerald-900 bg-emerald-100/70 px-2.5 py-0.5 rounded-md">
-              Total = R$ {adjLotePeriodCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              Total = R$ {finLotePeriodCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </div>
 
@@ -1152,8 +1179,8 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {/* Concentrados */}
-                  {adjAnimalConcItems.map(item => {
-                    const pctOfTotalCost = adjLotePeriodCost > 0 ? (item.lotTotalPeriodCost / adjLotePeriodCost) * 100 : 0;
+                  {finAnimalConcItems.map(item => {
+                    const pctOfTotalCost = finLotePeriodCost > 0 ? (item.lotTotalPeriodCost / finLotePeriodCost) * 100 : 0;
                     return (
                       <tr key={item.id} className="hover:bg-orange-50/20">
                         <td className="py-2 px-3 font-semibold text-gray-800">{item.itemInfo.name}</td>
@@ -1193,35 +1220,35 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                   })}
 
                   {/* Subtotal Concentrado */}
-                  {adjAnimalConcItems.length > 0 && (
+                  {finAnimalConcItems.length > 0 && (
                     <tr className="bg-[#fffcf8] font-bold border-t border-b border-orange-200 text-orange-950">
                       <td colSpan={2} className="py-2 px-3 uppercase text-[10px] text-orange-900">
                         Subtotal Concentrado
                       </td>
                       <td className="py-2 px-3 text-right font-bold text-orange-900">
-                        {adjAnimalConcDailyMN.toFixed(2)} kg
+                        {finAnimalConcDailyMN.toFixed(2)} kg
                       </td>
                       <td className="py-2 px-3 text-right border-l border-emerald-100 text-emerald-800 text-[10px]">
-                        Méd: R$ {adjConcRaw.sumMN > 0 ? (adjConcRaw.sumCost / adjConcRaw.sumMN).toFixed(2) : '0.00'}
+                        Méd: R$ {finConcRaw.sumMN > 0 ? (finConcRaw.sumCost / finConcRaw.sumMN).toFixed(2) : '0.00'}
                       </td>
                       <td className="py-2 px-3 text-right font-black text-emerald-900 bg-emerald-50/20">
-                        R$ {adjTotalConcCostDaily.toFixed(2)}
+                        R$ {finTotalConcCostDaily.toFixed(2)}
                       </td>
                       <td className="py-2 px-3 text-right text-orange-900 border-l border-gray-200">
-                        {(adjAnimalConcDailyMN * animais * days).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg
+                        {(finAnimalConcDailyMN * animais * days).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg
                       </td>
                       <td className="py-2 px-3 text-right font-black text-emerald-950 bg-emerald-100/30 border-l border-emerald-200">
-                        R$ {(adjTotalConcCostDaily * animais * days).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        R$ {(finTotalConcCostDaily * animais * days).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className="py-2 px-3 text-right text-orange-800 font-bold">
-                        {adjLotePeriodCost > 0 ? `${(((adjTotalConcCostDaily * animais * days) / adjLotePeriodCost) * 100).toFixed(1)}%` : '-'}
+                        {finLotePeriodCost > 0 ? `${(((finTotalConcCostDaily * animais * days) / finLotePeriodCost) * 100).toFixed(1)}%` : '-'}
                       </td>
                     </tr>
                   )}
 
                   {/* Volumosos */}
-                  {adjAnimalVolItems.map(item => {
-                    const pctOfTotalCost = adjLotePeriodCost > 0 ? (item.lotTotalPeriodCost / adjLotePeriodCost) * 100 : 0;
+                  {finAnimalVolItems.map(item => {
+                    const pctOfTotalCost = finLotePeriodCost > 0 ? (item.lotTotalPeriodCost / finLotePeriodCost) * 100 : 0;
                     return (
                       <tr key={item.id} className="hover:bg-green-50/20">
                         <td className="py-2 px-3 font-semibold text-gray-800">{item.itemInfo.name}</td>
@@ -1258,28 +1285,28 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                   })}
 
                   {/* Subtotal Volumoso */}
-                  {adjAnimalVolItems.length > 0 && (
+                  {finAnimalVolItems.length > 0 && (
                     <tr className="bg-[#f7fdf9] font-bold border-t border-b border-green-200 text-green-950">
                       <td colSpan={2} className="py-2 px-3 uppercase text-[10px] text-green-900">
                         Subtotal Volumoso
                       </td>
                       <td className="py-2 px-3 text-right font-bold text-green-900">
-                        {adjAnimalVolDailyMN.toFixed(2)} kg
+                        {finAnimalVolDailyMN.toFixed(2)} kg
                       </td>
                       <td className="py-2 px-3 text-right border-l border-emerald-100 text-emerald-800 text-[10px]">
-                        Méd: R$ {adjVolRaw.sumMN > 0 ? (adjVolRaw.sumCost / adjVolRaw.sumMN).toFixed(2) : '0.00'}
+                        Méd: R$ {finVolRaw.sumMN > 0 ? (finVolRaw.sumCost / finVolRaw.sumMN).toFixed(2) : '0.00'}
                       </td>
                       <td className="py-2 px-3 text-right font-black text-emerald-900 bg-emerald-50/20">
-                        R$ {adjTotalVolCostDaily.toFixed(2)}
+                        R$ {finTotalVolCostDaily.toFixed(2)}
                       </td>
                       <td className="py-2 px-3 text-right text-green-900 border-l border-gray-200">
-                        {(adjAnimalVolDailyMN * animais * days).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg
+                        {(finAnimalVolDailyMN * animais * days).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg
                       </td>
                       <td className="py-2 px-3 text-right font-black text-emerald-950 bg-emerald-100/30 border-l border-emerald-200">
-                        R$ {(adjTotalVolCostDaily * animais * days).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        R$ {(finTotalVolCostDaily * animais * days).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className="py-2 px-3 text-right text-green-800 font-bold">
-                        {adjLotePeriodCost > 0 ? `${(((adjTotalVolCostDaily * animais * days) / adjLotePeriodCost) * 100).toFixed(1)}%` : '-'}
+                        {finLotePeriodCost > 0 ? `${(((finTotalVolCostDaily * animais * days) / finLotePeriodCost) * 100).toFixed(1)}%` : '-'}
                       </td>
                     </tr>
                   )}
@@ -1292,19 +1319,19 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                       TOTAL DO LOTE ({animais} Cab, {days} Dias)
                     </td>
                     <td className="py-3 px-3 text-right text-emerald-100">
-                      {adjTotalMN.toFixed(2)} kg/dia
+                      {finTotalMN.toFixed(2)} kg/dia
                     </td>
                     <td className="py-3 px-3 text-right border-l border-emerald-800 text-emerald-200 text-[10px]">
-                      Méd: R$ {adjTotalMN > 0 ? (adjTotalCostDailyPerAnimal / adjTotalMN).toFixed(2) : '0.00'}
+                      Méd: R$ {finTotalMN > 0 ? (finTotalCostDailyPerAnimal / finTotalMN).toFixed(2) : '0.00'}
                     </td>
                     <td className="py-3 px-3 text-right text-amber-300 text-sm">
-                      R$ {adjTotalCostDailyPerAnimal.toFixed(2)}
+                      R$ {finTotalCostDailyPerAnimal.toFixed(2)}
                     </td>
                     <td className="py-3 px-3 text-right text-emerald-100 border-l border-emerald-800">
-                      {(adjTotalMN * animais * days).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg MN
+                      {(finTotalMN * animais * days).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg MN
                     </td>
                     <td className="py-3 px-3 text-right text-amber-300 border-l border-emerald-800 text-sm">
-                      R$ {adjLotePeriodCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      R$ {finLotePeriodCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td className="py-3 px-3 text-right text-emerald-200">
                       100%
@@ -1320,7 +1347,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5">
               <span className="text-[10px] font-bold text-gray-500 uppercase block mb-0.5">Custo por kg de Matéria Seca (CMS)</span>
               <div className="text-base font-bold text-gray-800">
-                {adjCostPerKgMS > 0 ? `R$ ${adjCostPerKgMS.toFixed(2)} / kg MS` : '-'}
+                {finCostPerKgMS > 0 ? `R$ ${finCostPerKgMS.toFixed(2)} / kg MS` : '-'}
               </div>
               <span className="text-[10px] text-gray-400">Relação direta com eficiência biológica</span>
             </div>
@@ -1328,8 +1355,8 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5">
               <span className="text-[10px] font-bold text-gray-500 uppercase block mb-0.5">Participação Financeira</span>
               <div className="text-base font-bold text-gray-800">
-                {adjTotalCostDailyPerAnimal > 0 
-                  ? `${((adjTotalConcCostDaily / adjTotalCostDailyPerAnimal) * 100).toFixed(0)}% Conc. : ${((adjTotalVolCostDaily / adjTotalCostDailyPerAnimal) * 100).toFixed(0)}% Vol.` 
+                {finTotalCostDailyPerAnimal > 0 
+                  ? `${((finTotalConcCostDaily / finTotalCostDailyPerAnimal) * 100).toFixed(0)}% Conc. : ${((finTotalVolCostDaily / finTotalCostDailyPerAnimal) * 100).toFixed(0)}% Vol.` 
                   : '-'}
               </div>
               <span className="text-[10px] text-gray-400">Distribuição do orçamento diário</span>
@@ -1338,7 +1365,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5">
               <span className="text-[10px] font-bold text-gray-500 uppercase block mb-0.5">Volume Total em Toneladas</span>
               <div className="text-base font-bold text-gray-800">
-                {((adjTotalMN * animais * days) / 1000).toFixed(2)} toneladas MN
+                {((finTotalMN * animais * days) / 1000).toFixed(2)} toneladas MN
               </div>
               <span className="text-[10px] text-gray-400">Demanda física de estocagem</span>
             </div>

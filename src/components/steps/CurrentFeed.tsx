@@ -25,7 +25,8 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
       ingredientId: defaultIngredient.id,
       type,
       mn: '',
-      ms: ''
+      ms: '',
+      pricePerKg: ''
     };
     updateData({
       hasCurrentDiet: true,
@@ -55,6 +56,8 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
         } else if (field === 'ingredientId') {
           const mn = Number(c.mn) || 0;
           updated.ms = c.mn === '' ? '' : mn * (itemInfo.msPercent / 100);
+        } else if (field === 'pricePerKg') {
+          updated.pricePerKg = value === '' ? '' : Number(value);
         }
         return updated;
       })
@@ -69,7 +72,8 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
       ingredientId: defaultVol.id,
       type: 'Volumoso',
       mn: '',
-      ms: ''
+      ms: '',
+      pricePerKg: ''
     };
     updateData({
       hasCurrentDiet: true,
@@ -99,6 +103,8 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
         } else if (field === 'ingredientId') {
           const mn = Number(v.mn) || 0;
           updated.ms = v.mn === '' ? '' : mn * (itemInfo.msPercent / 100);
+        } else if (field === 'pricePerKg') {
+          updated.pricePerKg = value === '' ? '' : Number(value);
         }
         return updated;
       })
@@ -108,45 +114,59 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
   // Resolve Concentrates
   let concMS = 0;
   let concMN = 0;
+  let concCostTotal = 0;
   const resolvedConc = data.currentConcentrates.map(entry => {
     const itemInfo = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
     if (!itemInfo) return null;
     const mnVal = Number(entry.mn) || 0;
     const msVal = entry.mn === '' ? 0 : mnVal * (itemInfo.msPercent / 100);
+    const priceKg = entry.pricePerKg !== undefined && entry.pricePerKg !== '' ? Number(entry.pricePerKg) || 0 : 0;
+    const itemCostTotal = mnVal * priceKg;
     concMS += msVal;
     concMN += mnVal;
-    return { ...entry, itemInfo, mnVal, msVal };
+    concCostTotal += itemCostTotal;
+    return { ...entry, itemInfo, mnVal, msVal, priceKg, itemCostTotal };
   }).filter(Boolean) as {
     id: string;
     ingredientId: string;
     type: string;
     mn: number | '';
     ms: number | '';
+    pricePerKg?: number | '';
     itemInfo: IngredientDef;
     mnVal: number;
     msVal: number;
+    priceKg: number;
+    itemCostTotal: number;
   }[];
 
   // Resolve Volumosos
   let volMS = 0;
   let volMN = 0;
+  let volCostTotal = 0;
   const resolvedVol = data.currentVolumosos.map(entry => {
     const itemInfo = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
     if (!itemInfo) return null;
     const mnVal = Number(entry.mn) || 0;
     const msVal = entry.mn === '' ? 0 : mnVal * (itemInfo.msPercent / 100);
+    const priceKg = entry.pricePerKg !== undefined && entry.pricePerKg !== '' ? Number(entry.pricePerKg) || 0 : 0;
+    const itemCostTotal = mnVal * priceKg;
     volMS += msVal;
     volMN += mnVal;
-    return { ...entry, itemInfo, mnVal, msVal };
+    volCostTotal += itemCostTotal;
+    return { ...entry, itemInfo, mnVal, msVal, priceKg, itemCostTotal };
   }).filter(Boolean) as {
     id: string;
     ingredientId: string;
     type: string;
     mn: number | '';
     ms: number | '';
+    pricePerKg?: number | '';
     itemInfo: IngredientDef;
     mnVal: number;
     msVal: number;
+    priceKg: number;
+    itemCostTotal: number;
   }[];
 
   // Nutrient calculation helper
@@ -202,6 +222,19 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
   const animalConcMS = numConcKg * avgConcMSPct;
   const animalVolMS = numVolKg * avgVolMSPct;
   const totalAnimalMS = animalConcMS + animalVolMS;
+
+  // Custos por Animal/Dia (R$/animal/dia) — mesma lógica da Etapa 4:
+  // % de cada insumo na batida × quantidade fornecida por animal × preço (R$/kg MN)
+  const animalConcDailyCost = resolvedConc.reduce((acc, entry) => {
+    const pct = concMN > 0 ? entry.mnVal / concMN : 0;
+    return acc + pct * numConcKg * entry.priceKg;
+  }, 0);
+  const animalVolDailyCost = resolvedVol.reduce((acc, entry) => {
+    const pct = volMN > 0 ? entry.mnVal / volMN : 0;
+    return acc + pct * numVolKg * entry.priceKg;
+  }, 0);
+  const totalAnimalDailyCost = animalConcDailyCost + animalVolDailyCost;
+  const formatBRL = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const calculatedConcPctMS = totalAnimalMS > 0 ? (animalConcMS / totalAnimalMS) * 100 : 0;
   const calculatedVolPctMS = totalAnimalMS > 0 ? (animalVolMS / totalAnimalMS) * 100 : 0;
@@ -307,81 +340,125 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
           </div>
 
           {/* Concentrates Table */}
-          <div className="border border-gray-100 rounded-xl overflow-visible mb-4">
-            <div className="grid grid-cols-12 gap-3 pb-3 pt-3 bg-gray-50/80 border-b border-gray-200 text-xs font-bold text-gray-500 px-4 uppercase">
-              <div className="col-span-2">Tipo</div>
-              <div className="col-span-4">Insumo</div>
-              <div className="col-span-2">MN (kg)</div>
-              <div className="col-span-2">MS (kg)</div>
-              <div className="col-span-1">% Mistura</div>
-              <div className="col-span-1 text-center">Ações</div>
-            </div>
-
-            <div className="divide-y divide-gray-100 min-h-[90px]">
-              {resolvedConc.length === 0 ? (
-                <div className="text-center text-gray-400 py-8 text-sm">
-                  Nenhum concentrado ou mineral adicionado.
-                </div>
-              ) : (
-                resolvedConc.map(entry => {
-                  const pct = concMN > 0 ? ((entry.mnVal / concMN) * 100).toFixed(1) : '0.0';
-                  return (
-                    <div key={entry.id} className="grid grid-cols-12 gap-3 items-center text-sm px-4 py-3 hover:bg-orange-50/20 transition-colors">
-                      <div className="col-span-2">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border ${
-                          entry.type === 'Concentrado' ? 'bg-orange-50 text-orange-600 border-orange-200' : 
-                          'bg-slate-50 text-slate-600 border-slate-200'
-                        }`}>
-                          {entry.type}
-                        </span>
-                      </div>
-                      <div className="col-span-4">
-                        <SearchableIngredientSelect
-                          value={entry.ingredientId}
-                          onChange={(newId) => updateConcentrate(entry.id, 'ingredientId', newId)}
-                          ingredients={MOCK_INGREDIENTS.filter(i => i.type === entry.type)}
-                          theme="orange"
-                          placeholder="Buscar insumo..."
-                        />
-                      </div>
-                      <div className="col-span-2">
-                        <input 
-                          type="number" 
-                          step="0.01"
-                          placeholder="0.00"
-                          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-semibold text-gray-800"
-                          value={entry.mn}
-                          onChange={(e) => updateConcentrate(entry.id, 'mn', e.target.value)}
-                        />
-                      </div>
-                      <div className="col-span-2 text-gray-600 font-semibold px-1">
-                        {entry.msVal > 0 ? `${entry.msVal.toFixed(2)} kg` : '-'}
-                      </div>
-                      <div className="col-span-1 text-gray-700 font-bold px-1">
-                        {pct}%
-                      </div>
-                      <div className="col-span-1 flex justify-center">
-                        <button 
-                          type="button"
-                          onClick={() => removeConcentrate(entry.id)}
-                          className="text-gray-400 hover:text-red-600 transition p-1.5 rounded-lg hover:bg-red-50 cursor-pointer"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+          <div className="border border-gray-100 rounded-xl overflow-hidden mb-4 overflow-x-auto shadow-2xs">
+            <table className="w-full text-left border-collapse min-w-[760px]">
+              <thead>
+                <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                  <th className="py-3 px-3 w-28">Tipo</th>
+                  <th className="py-3 px-3">Insumo</th>
+                  <th className="py-3 px-3 w-32">MN (kg)</th>
+                  <th className="py-3 px-3 w-24">MS (kg)</th>
+                  <th className="py-3 px-3 w-20">% Mistura</th>
+                  <th className="py-3 px-3 w-24">Consumo/Dia</th>
+                  <th className="py-3 px-3 w-32 bg-emerald-50/60 text-emerald-900 border-l border-emerald-100">
+                    Preço (R$/kg)
+                  </th>
+                  <th className="py-3 px-3 w-32 bg-emerald-50/60 text-emerald-900">
+                    Total (R$)
+                  </th>
+                  <th className="py-3 px-2 w-12 text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-sm">
+                {resolvedConc.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="text-center text-gray-400 py-8 text-sm">
+                      Nenhum concentrado ou mineral adicionado.
+                    </td>
+                  </tr>
+                ) : (
+                  resolvedConc.map(entry => {
+                    const pct = concMN > 0 ? (entry.mnVal / concMN) * 100 : 0;
+                    const animalDailyMN = (pct / 100) * numConcKg;
+                    const animalDailyCost = animalDailyMN * entry.priceKg;
+                    return (
+                      <tr key={entry.id} className="hover:bg-orange-50/20 transition-colors">
+                        <td className="py-2.5 px-3">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border ${
+                            entry.type === 'Concentrado' ? 'bg-orange-50 text-orange-600 border-orange-200' : 
+                            'bg-slate-50 text-slate-600 border-slate-200'
+                          }`}>
+                            {entry.type}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 min-w-[220px]">
+                          <SearchableIngredientSelect
+                            value={entry.ingredientId}
+                            onChange={(newId) => updateConcentrate(entry.id, 'ingredientId', newId)}
+                            ingredients={MOCK_INGREDIENTS.filter(i => i.type === entry.type)}
+                            theme="orange"
+                            placeholder="Buscar insumo..."
+                          />
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <input 
+                            type="number" 
+                            step="0.01"
+                            placeholder="0.00"
+                            className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-semibold text-gray-800"
+                            value={entry.mn}
+                            onChange={(e) => updateConcentrate(entry.id, 'mn', e.target.value)}
+                          />
+                        </td>
+                        <td className="py-2.5 px-3 text-gray-600 font-semibold text-xs sm:text-sm">
+                          {entry.msVal > 0 ? `${entry.msVal.toFixed(2)} kg` : '-'}
+                        </td>
+                        <td className="py-2.5 px-3 text-gray-700 font-bold text-xs sm:text-sm">
+                          {pct.toFixed(1)}%
+                        </td>
+                        <td className="py-2.5 px-3 text-orange-700 font-bold text-xs" title="Consumo por animal calculado a partir da quantidade fornecida (kg MN/animal/dia)">
+                          {animalDailyMN > 0 ? `${animalDailyMN.toFixed(2)} kg` : '-'}
+                        </td>
+                        <td className="py-2.5 px-3 bg-emerald-50/20 border-l border-emerald-100">
+                          <div className="relative rounded-lg">
+                            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2 text-xs font-bold text-emerald-700">
+                              R$
+                            </span>
+                            <input 
+                              type="number" 
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              className="w-full border border-emerald-200 rounded-lg pl-7 pr-2 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-900 bg-white"
+                              value={entry.pricePerKg ?? ''}
+                              onChange={(e) => updateConcentrate(entry.id, 'pricePerKg', e.target.value)}
+                            />
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 bg-emerald-50/20">
+                          <div className="font-black text-emerald-800 text-xs sm:text-sm">
+                            {entry.itemCostTotal > 0 ? `R$ ${formatBRL(entry.itemCostTotal)}` : '-'}
+                          </div>
+                          {animalDailyCost > 0 && (
+                            <div className="text-[10px] text-emerald-700 font-semibold" title="Custo diário por animal">
+                              R$ {animalDailyCost.toFixed(2)}/cab/dia
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-2 text-center">
+                          <button 
+                            type="button"
+                            onClick={() => removeConcentrate(entry.id)}
+                            className="text-gray-400 hover:text-red-600 transition p-1.5 rounded-lg hover:bg-red-50 cursor-pointer"
+                            title="Remover insumo"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
 
           {/* Subtotal Concentrado */}
-          <div className="flex justify-between items-center bg-[#fff8eb] border border-orange-100 rounded-xl px-5 py-3 mb-6">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-[#fff8eb] border border-orange-100 rounded-xl px-5 py-3 mb-6 gap-3">
             <span className="text-xs font-bold text-orange-700 uppercase tracking-wide">
               Subtotal da Batelada de Concentrado
             </span>
-            <div className="flex gap-6 text-right">
+            <div className="flex flex-wrap gap-4 sm:gap-6 text-left sm:text-right">
               <div>
                 <span className="text-[10px] font-bold text-orange-600 uppercase block">Total MN Batida</span>
                 <span className="text-base font-black text-orange-800">{concMN.toFixed(2)} kg</span>
@@ -389,6 +466,23 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
               <div>
                 <span className="text-[10px] font-bold text-orange-600 uppercase block">Total MS Batida</span>
                 <span className="text-base font-black text-orange-800">{concMS.toFixed(2)} kg</span>
+              </div>
+              <div className="border-l border-orange-200 pl-4 sm:pl-6">
+                <span className="text-[10px] font-bold text-emerald-700 uppercase block">Valor Total Batida</span>
+                <span className="text-base font-black text-emerald-800">
+                  {concCostTotal > 0 ? `R$ ${formatBRL(concCostTotal)}` : '-'}
+                </span>
+                {concMN > 0 && concCostTotal > 0 && (
+                  <span className="text-[10px] text-emerald-700 font-medium block">
+                    Médio: R$ {(concCostTotal / concMN).toFixed(2)}/kg
+                  </span>
+                )}
+              </div>
+              <div className="border-l border-orange-200 pl-4 sm:pl-6">
+                <span className="text-[10px] font-bold text-emerald-700 uppercase block">Custo p/ Animal</span>
+                <span className="text-base font-black text-emerald-800">
+                  {animalConcDailyCost > 0 ? `R$ ${animalConcDailyCost.toFixed(2)}/dia` : '-'}
+                </span>
               </div>
             </div>
           </div>
@@ -441,78 +535,122 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
           </div>
 
           {/* Volumoso Table */}
-          <div className="border border-gray-100 rounded-xl overflow-visible mb-4">
-            <div className="grid grid-cols-12 gap-3 pb-3 pt-3 bg-gray-50/80 border-b border-gray-200 text-xs font-bold text-gray-500 px-4 uppercase">
-              <div className="col-span-2">Tipo</div>
-              <div className="col-span-4">Insumo</div>
-              <div className="col-span-2">MN (kg)</div>
-              <div className="col-span-2">MS (kg)</div>
-              <div className="col-span-1">% Mistura</div>
-              <div className="col-span-1 text-center">Ações</div>
-            </div>
-
-            <div className="divide-y divide-gray-100 min-h-[90px]">
-              {resolvedVol.length === 0 ? (
-                <div className="text-center text-gray-400 py-8 text-sm">
-                  Nenhum volumoso adicionado.
-                </div>
-              ) : (
-                resolvedVol.map(entry => {
-                  const pct = volMN > 0 ? ((entry.mnVal / volMN) * 100).toFixed(1) : '0.0';
-                  return (
-                    <div key={entry.id} className="grid grid-cols-12 gap-3 items-center text-sm px-4 py-3 hover:bg-green-50/20 transition-colors">
-                      <div className="col-span-2">
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border bg-green-50 text-green-700 border-green-200">
-                          Volumoso
-                        </span>
-                      </div>
-                      <div className="col-span-4">
-                        <SearchableIngredientSelect
-                          value={entry.ingredientId}
-                          onChange={(newId) => updateVolumoso(entry.id, 'ingredientId', newId)}
-                          ingredients={MOCK_INGREDIENTS.filter(i => i.type === 'Volumoso')}
-                          theme="green"
-                          placeholder="Buscar volumoso..."
-                        />
-                      </div>
-                      <div className="col-span-2">
-                        <input 
-                          type="number" 
-                          step="0.01"
-                          placeholder="0.00"
-                          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 font-semibold text-gray-800"
-                          value={entry.mn}
-                          onChange={(e) => updateVolumoso(entry.id, 'mn', e.target.value)}
-                        />
-                      </div>
-                      <div className="col-span-2 text-gray-600 font-semibold px-1">
-                        {entry.msVal > 0 ? `${entry.msVal.toFixed(2)} kg` : '-'}
-                      </div>
-                      <div className="col-span-1 text-gray-700 font-bold px-1">
-                        {pct}%
-                      </div>
-                      <div className="col-span-1 flex justify-center">
-                        <button 
-                          type="button"
-                          onClick={() => removeVolumoso(entry.id)}
-                          className="text-gray-400 hover:text-red-600 transition p-1.5 rounded-lg hover:bg-red-50 cursor-pointer"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+          <div className="border border-gray-100 rounded-xl overflow-hidden mb-4 overflow-x-auto shadow-2xs">
+            <table className="w-full text-left border-collapse min-w-[760px]">
+              <thead>
+                <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                  <th className="py-3 px-3 w-28">Tipo</th>
+                  <th className="py-3 px-3">Insumo</th>
+                  <th className="py-3 px-3 w-32">MN (kg)</th>
+                  <th className="py-3 px-3 w-24">MS (kg)</th>
+                  <th className="py-3 px-3 w-20">% Mistura</th>
+                  <th className="py-3 px-3 w-24">Consumo/Dia</th>
+                  <th className="py-3 px-3 w-32 bg-emerald-50/60 text-emerald-900 border-l border-emerald-100">
+                    Preço (R$/kg)
+                  </th>
+                  <th className="py-3 px-3 w-32 bg-emerald-50/60 text-emerald-900">
+                    Total (R$)
+                  </th>
+                  <th className="py-3 px-2 w-12 text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-sm">
+                {resolvedVol.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="text-center text-gray-400 py-8 text-sm">
+                      Nenhum volumoso adicionado.
+                    </td>
+                  </tr>
+                ) : (
+                  resolvedVol.map(entry => {
+                    const pct = volMN > 0 ? (entry.mnVal / volMN) * 100 : 0;
+                    const animalDailyMN = (pct / 100) * numVolKg;
+                    const animalDailyCost = animalDailyMN * entry.priceKg;
+                    return (
+                      <tr key={entry.id} className="hover:bg-green-50/20 transition-colors">
+                        <td className="py-2.5 px-3">
+                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border bg-green-50 text-green-700 border-green-200">
+                            Volumoso
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 min-w-[220px]">
+                          <SearchableIngredientSelect
+                            value={entry.ingredientId}
+                            onChange={(newId) => updateVolumoso(entry.id, 'ingredientId', newId)}
+                            ingredients={MOCK_INGREDIENTS.filter(i => i.type === 'Volumoso')}
+                            theme="green"
+                            placeholder="Buscar volumoso..."
+                          />
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <input 
+                            type="number" 
+                            step="0.01"
+                            placeholder="0.00"
+                            className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-green-500 font-semibold text-gray-800"
+                            value={entry.mn}
+                            onChange={(e) => updateVolumoso(entry.id, 'mn', e.target.value)}
+                          />
+                        </td>
+                        <td className="py-2.5 px-3 text-gray-600 font-semibold text-xs sm:text-sm">
+                          {entry.msVal > 0 ? `${entry.msVal.toFixed(2)} kg` : '-'}
+                        </td>
+                        <td className="py-2.5 px-3 text-gray-700 font-bold text-xs sm:text-sm">
+                          {pct.toFixed(1)}%
+                        </td>
+                        <td className="py-2.5 px-3 text-green-700 font-bold text-xs" title="Consumo por animal calculado a partir da quantidade fornecida (kg MN/animal/dia)">
+                          {animalDailyMN > 0 ? `${animalDailyMN.toFixed(2)} kg` : '-'}
+                        </td>
+                        <td className="py-2.5 px-3 bg-emerald-50/20 border-l border-emerald-100">
+                          <div className="relative rounded-lg">
+                            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2 text-xs font-bold text-emerald-700">
+                              R$
+                            </span>
+                            <input 
+                              type="number" 
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              className="w-full border border-emerald-200 rounded-lg pl-7 pr-2 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-900 bg-white"
+                              value={entry.pricePerKg ?? ''}
+                              onChange={(e) => updateVolumoso(entry.id, 'pricePerKg', e.target.value)}
+                            />
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 bg-emerald-50/20">
+                          <div className="font-black text-emerald-800 text-xs sm:text-sm">
+                            {entry.itemCostTotal > 0 ? `R$ ${formatBRL(entry.itemCostTotal)}` : '-'}
+                          </div>
+                          {animalDailyCost > 0 && (
+                            <div className="text-[10px] text-emerald-700 font-semibold" title="Custo diário por animal">
+                              R$ {animalDailyCost.toFixed(2)}/cab/dia
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-2 text-center">
+                          <button 
+                            type="button"
+                            onClick={() => removeVolumoso(entry.id)}
+                            className="text-gray-400 hover:text-red-600 transition p-1.5 rounded-lg hover:bg-red-50 cursor-pointer"
+                            title="Remover insumo"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
 
           {/* Subtotal Volumoso */}
-          <div className="flex justify-between items-center bg-[#ecfdf3] border border-green-100 rounded-xl px-5 py-3 mb-6">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-[#ecfdf3] border border-green-100 rounded-xl px-5 py-3 mb-6 gap-3">
             <span className="text-xs font-bold text-green-700 uppercase tracking-wide">
               Subtotal da Batelada de Volumoso
             </span>
-            <div className="flex gap-6 text-right">
+            <div className="flex flex-wrap gap-4 sm:gap-6 text-left sm:text-right">
               <div>
                 <span className="text-[10px] font-bold text-green-600 uppercase block">Total MN Batida</span>
                 <span className="text-base font-black text-green-800">{volMN.toFixed(2)} kg</span>
@@ -520,6 +658,23 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
               <div>
                 <span className="text-[10px] font-bold text-green-600 uppercase block">Total MS Batida</span>
                 <span className="text-base font-black text-green-800">{volMS.toFixed(2)} kg</span>
+              </div>
+              <div className="border-l border-green-200 pl-4 sm:pl-6">
+                <span className="text-[10px] font-bold text-emerald-700 uppercase block">Valor Total Batida</span>
+                <span className="text-base font-black text-emerald-800">
+                  {volCostTotal > 0 ? `R$ ${formatBRL(volCostTotal)}` : '-'}
+                </span>
+                {volMN > 0 && volCostTotal > 0 && (
+                  <span className="text-[10px] text-emerald-700 font-medium block">
+                    Médio: R$ {(volCostTotal / volMN).toFixed(2)}/kg
+                  </span>
+                )}
+              </div>
+              <div className="border-l border-green-200 pl-4 sm:pl-6">
+                <span className="text-[10px] font-bold text-emerald-700 uppercase block">Custo p/ Animal</span>
+                <span className="text-base font-black text-emerald-800">
+                  {animalVolDailyCost > 0 ? `R$ ${animalVolDailyCost.toFixed(2)}/dia` : '-'}
+                </span>
               </div>
             </div>
           </div>
@@ -705,6 +860,12 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
                 <div className="flex justify-between items-center text-[11px]">
                   <span className="text-blue-300">Meta CMS teórica (Perfil):</span>
                   <span className="font-semibold text-blue-200">{metaCMS.toFixed(2)} kg MS/dia</span>
+                </div>
+                <div className="flex justify-between items-center text-[11px] pt-2 border-t border-blue-700/60">
+                  <span className="text-blue-300">Custo Alimentar Atual:</span>
+                  <span className="font-black text-emerald-300 text-sm">
+                    {totalAnimalDailyCost > 0 ? `R$ ${totalAnimalDailyCost.toFixed(2)}/cab/dia` : '-'}
+                  </span>
                 </div>
               </div>
             </div>

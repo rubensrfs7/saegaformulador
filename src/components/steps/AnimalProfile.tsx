@@ -47,7 +47,7 @@ export default function AnimalProfile({ data, updateData, onOpenDatabase }: Prop
               title="Abrir tabela completa de Consumo de Matéria Seca"
             >
               <Database size={14} />
-              <span>Consultar Banco de Dados (18 perfis)</span>
+              <span>Consultar Banco de Dados ({CONSUMPTION_TARGETS.length} perfis)</span>
             </button>
           )}
         </div>

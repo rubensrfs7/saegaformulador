@@ -29,7 +29,8 @@ export default function DatabaseView({
 
   // Grouped counts
   const cmsCount = CONSUMPTION_TARGETS.length; // 18
-  const mineraisCount = MOCK_INGREDIENTS.filter(i => i.type === 'Mineral').length; // 15
+  const mineraisCount = MOCK_INGREDIENTS.filter(i => i.type === 'Mineral').length;
+  const insumosCount = MOCK_INGREDIENTS.filter(i => i.type !== 'Mineral').length;
 
   // Unique categories for filtering
   const categories = useMemo(() => {
@@ -109,7 +110,7 @@ export default function DatabaseView({
             }`}
           >
             <span>Insumos</span>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${activeTab === 'insumos' ? 'bg-blue-100 text-blue-800' : 'bg-gray-200 text-gray-600'}`}>140</span>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${activeTab === 'insumos' ? 'bg-blue-100 text-blue-800' : 'bg-gray-200 text-gray-600'}`}>{insumosCount}</span>
             {activeTab === 'insumos' && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-700 rounded-full" />}
           </button>
 
