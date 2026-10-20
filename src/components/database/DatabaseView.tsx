@@ -159,17 +159,35 @@ export default function DatabaseView({
                   <th className="py-3 px-4">CATEGORIA</th>
                   <th className="py-3 px-4">SUBCATEGORIA</th>
                   <th className="py-3 px-3 text-right">PV REF (KG)</th>
-                  <th className="py-3 px-3 text-right">MS (KG/DIA)</th>
+                  <th className="py-3 px-3 text-right">% PV EM MS</th>
+                  <th className="py-3 px-3 text-right">CONS. MS (KG/D)</th>
+                  <th className="py-3 px-3 text-right">VOL. (%)</th>
+                  <th className="py-3 px-3 text-right">CONC. (%)</th>
+                  <th className="py-3 px-3 text-right">PB TMR (G)</th>
+                  <th className="py-3 px-3 text-right">NDT TMR (G)</th>
+                  <th className="py-3 px-3 text-right">FDN TMR (G)</th>
+                  <th className="py-3 px-3 text-right">AMIDO (%)</th>
                   <th className="py-3 px-3 text-center">AÇÕES</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-medium">
                 {filteredTargets.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-blue-50/30 transition-colors cursor-pointer" onClick={() => setInspectingTarget(item)}>
+                  <tr 
+                    key={`${item.category}-${item.subcategory}-${idx}`}
+                    className="hover:bg-blue-50/30 transition-colors cursor-pointer group"
+                    onClick={() => setInspectingTarget(item)}
+                  >
                     <td className="py-3 px-4 font-semibold text-gray-900">{item.category}</td>
-                    <td className="py-3 px-4">{item.subcategory}</td>
+                    <td className="py-3 px-4 text-gray-700 font-medium">{item.subcategory}</td>
                     <td className="py-3 px-3 text-right">{item.pvReferencia}</td>
+                    <td className="py-3 px-3 text-right">{item.percentPvMs.toFixed(2)}%</td>
                     <td className="py-3 px-3 text-right font-bold text-blue-900">{item.consumoMs}</td>
+                    <td className="py-3 px-3 text-right">{item.volumosoPercent}%</td>
+                    <td className="py-3 px-3 text-right">{item.concentradoPercent}%</td>
+                    <td className="py-3 px-3 text-right">{item.pbTmr}</td>
+                    <td className="py-3 px-3 text-right">{item.ndtTmr}</td>
+                    <td className="py-3 px-3 text-right">{item.fdnTmr}</td>
+                    <td className="py-3 px-3 text-right">{item.amidoPercent}%</td>
                     <td className="py-3 px-3 text-center">
                       <button type="button" onClick={(e) => { e.stopPropagation(); setInspectingTarget(item); }} className="text-gray-400 hover:text-blue-700"><Info size={16} /></button>
                     </td>
@@ -188,9 +206,15 @@ export default function DatabaseView({
                 <tr className="border-b border-gray-200 bg-gray-50/70 text-[11px] font-bold text-gray-500 uppercase">
                   <th className="py-3 px-4">INSUMO</th>
                   <th className="py-3 px-4">TIPO</th>
-                  <th className="py-3 px-3 text-right">% MS</th>
-                  <th className="py-3 px-3 text-right">PB</th>
-                  <th className="py-3 px-3 text-right">NDT</th>
+                  <th className="py-3 px-3 text-right">PB (G)</th>
+                  <th className="py-3 px-3 text-right">NDT (G)</th>
+                  <th className="py-3 px-3 text-right">FDN (G)</th>
+                  <th className="py-3 px-3 text-right">MS (G)</th>
+                  <th className="py-3 px-3 text-right">MS (%)</th>
+                  <th className="py-3 px-3 text-right">MN/KG MS (G)</th>
+                  <th className="py-3 px-3 text-right">AMIDO (G)</th>
+                  <th className="py-3 px-3 text-right">CA (G)</th>
+                  <th className="py-3 px-3 text-right">P (G)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-medium">
@@ -198,9 +222,15 @@ export default function DatabaseView({
                   <tr key={item.id} className="hover:bg-gray-50/60">
                     <td className="py-3 px-4">{item.name}</td>
                     <td className="py-3 px-4">{item.type}</td>
-                    <td className="py-3 px-3 text-right">{item.msPercent}%</td>
                     <td className="py-3 px-3 text-right">{item.pb}</td>
                     <td className="py-3 px-3 text-right">{item.ndt}</td>
+                    <td className="py-3 px-3 text-right">{item.fdn}</td>
+                    <td className="py-3 px-3 text-right">{item.msPercent * 10}</td>
+                    <td className="py-3 px-3 text-right">{item.msPercent}%</td>
+                    <td className="py-3 px-3 text-right">{(1000 / (item.msPercent / 100)).toFixed(0)}</td>
+                    <td className="py-3 px-3 text-right">{item.amido}</td>
+                    <td className="py-3 px-3 text-right">{item.calcio}</td>
+                    <td className="py-3 px-3 text-right">{item.fosforo}</td>
                   </tr>
                 ))}
               </tbody>

@@ -73,6 +73,7 @@ export const MOCK_INGREDIENTS: IngredientDef[] = [
   { id: 'c29', name: 'Soja, farelo extrusado', type: 'Concentrado', pb: 440, ndt: 820, fdn: 110, amido: 6, calcio: 0.35, fosforo: 0.65, msPercent: 90 },
   { id: 'c30', name: 'Soja Grão', type: 'Concentrado', pb: 360, ndt: 900, fdn: 123, amido: 5, calcio: 0.25, fosforo: 0.6, msPercent: 90 },
   { id: 'c31', name: 'Soja Int.Extrus.', type: 'Concentrado', pb: 380, ndt: 900, fdn: 150, amido: 5, calcio: 0.25, fosforo: 0.6, msPercent: 90 },
+  { id: 'c35', name: 'Ureia Pecuária', type: 'Concentrado', pb: 2810, ndt: 0, fdn: 0, amido: 0, calcio: 0, fosforo: 0, msPercent: 99 },
   { id: 'c32', name: 'Soja Casquinha', type: 'Concentrado', pb: 98, ndt: 670, fdn: 684, amido: 2, calcio: 0.6, fosforo: 0.15, msPercent: 90 },
   { id: 'c33', name: 'Soja Resíduo', type: 'Concentrado', pb: 240, ndt: 700, fdn: 370, amido: 8, calcio: 0.35, fosforo: 0.5, msPercent: 89 },
   { id: 'c34', name: 'Sorgo Grão', type: 'Concentrado', pb: 100, ndt: 760, fdn: 162, amido: 680, calcio: 0.3, fosforo: 3, msPercent: 89 },
