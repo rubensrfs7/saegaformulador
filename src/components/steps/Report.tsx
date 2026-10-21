@@ -67,6 +67,13 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
       title: '8. Detalhamento de Custos por Insumo e Orçamento de Compras do Lote',
       enabled: true,
       iconName: 'DollarSign'
+    },
+    {
+      id: 9,
+      defaultTitle: '9. Consolidado da Mistura do Lote (Concentrado Total + Volumosos)',
+      title: '9. Consolidado da Mistura do Lote (Concentrado Total + Volumosos)',
+      enabled: true,
+      iconName: 'Layers'
     }
   ]);
 
@@ -97,17 +104,33 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
     return sections.find(s => s.id === id) || { title: '', enabled: true, iconName: 'User' };
   };
 
-  const getSectionIcon = (iconName: string) => {
+  const getSectionIcon = (iconName: string, size = 20, enabled = true) => {
+    const iconClass = enabled ? 'text-white' : 'text-gray-400';
     switch (iconName) {
-      case 'User': return <User size={18} className="text-blue-600" />;
-      case 'BarChart2': return <BarChart2 size={18} className="text-blue-600" />;
-      case 'Layers': return <Layers size={18} className="text-orange-600" />;
-      case 'Sprout': return <Sprout size={18} className="text-green-600" />;
-      case 'PieChart': return <PieChart size={18} className="text-blue-600" />;
-      case 'Activity': return <Activity size={18} className="text-purple-600" />;
-      case 'Users': return <Users size={18} className="text-blue-600" />;
-      case 'DollarSign': return <DollarSign size={18} className="text-emerald-600" />;
-      default: return <User size={18} className="text-blue-600" />;
+      case 'User': return <User size={size} className={iconClass} />;
+      case 'BarChart2': return <BarChart2 size={size} className={iconClass} />;
+      case 'Layers': return <Layers size={size} className={iconClass} />;
+      case 'Sprout': return <Sprout size={size} className={iconClass} />;
+      case 'PieChart': return <PieChart size={size} className={iconClass} />;
+      case 'Activity': return <Activity size={size} className={iconClass} />;
+      case 'Users': return <Users size={size} className={iconClass} />;
+      case 'DollarSign': return <DollarSign size={size} className={iconClass} />;
+      default: return <User size={size} className={iconClass} />;
+    }
+  };
+
+  const getSectionBadgeBg = (iconName: string, enabled: boolean) => {
+    if (!enabled) return 'bg-gray-200/80 border border-gray-300 text-gray-400';
+    switch (iconName) {
+      case 'User': return 'bg-blue-600 border border-blue-700 text-white shadow-sm';
+      case 'BarChart2': return 'bg-indigo-600 border border-indigo-700 text-white shadow-sm';
+      case 'Layers': return 'bg-orange-500 border border-orange-600 text-white shadow-sm';
+      case 'Sprout': return 'bg-green-600 border border-green-700 text-white shadow-sm';
+      case 'PieChart': return 'bg-teal-600 border border-teal-700 text-white shadow-sm';
+      case 'Activity': return 'bg-purple-600 border border-purple-700 text-white shadow-sm';
+      case 'Users': return 'bg-blue-700 border border-blue-800 text-white shadow-sm';
+      case 'DollarSign': return 'bg-emerald-600 border border-emerald-700 text-white shadow-sm';
+      default: return 'bg-blue-600 text-white';
     }
   };
 
@@ -276,6 +299,8 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
   const finAnimalVolItems = hasAdjustedDiet ? adjAnimalVolItems : currAnimalVolItems;
   const finAnimalConcDailyMN = hasAdjustedDiet ? adjAnimalConcDailyMN : currAnimalConcDailyMN;
   const finAnimalVolDailyMN = hasAdjustedDiet ? adjAnimalVolDailyMN : currAnimalVolDailyMN;
+  const finTotalConcMSDaily = finAnimalConcItems.reduce((acc, i) => acc + i.msVal, 0);
+  const finTotalVolMSDaily = finAnimalVolItems.reduce((acc, i) => acc + i.msVal, 0);
   const finConcRaw = hasAdjustedDiet ? adjConcRaw : currConcRaw;
   const finVolRaw = hasAdjustedDiet ? adjVolRaw : currVolRaw;
   const finTotalMN = hasAdjustedDiet ? adjTotalMN : currTotalMN;
@@ -413,74 +438,147 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
 
       {/* Modal de Personalização do Relatório */}
       {isCustomizingModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
             <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
-                  <Sliders size={20} />
+                <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-md">
+                  <Sliders size={22} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-gray-900">Personalizar Relatório</h3>
-                  <p className="text-xs text-gray-500">Selecione as seções exibidas, altere títulos e organize o relatório.</p>
+                  <h3 className="text-xl font-black text-gray-900">Personalizar Relatório</h3>
+                  <p className="text-xs text-gray-500">Ative ou desative seções e edite os títulos de exibição do documento.</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={cancelCustomizingModal}
-                className="text-gray-400 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100 transition cursor-pointer"
+                className="text-gray-400 hover:text-gray-700 p-2 rounded-xl hover:bg-gray-100 transition cursor-pointer"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+            {/* Sub-bar with Quick Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-3 bg-slate-50 border-b border-gray-200 text-xs">
+              <span className="font-semibold text-gray-600">
+                Seções exibidas no relatório: <strong className="text-blue-700 font-black">{sections.filter(s => s.enabled).length} de {sections.length}</strong>
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSections(sections.map(s => ({ ...s, enabled: true })))}
+                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50 transition cursor-pointer shadow-2xs"
+                >
+                  Ativar Todas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSections(sections.map(s => ({ ...s, enabled: false })))}
+                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white text-gray-600 border border-gray-200 hover:bg-gray-100 transition cursor-pointer shadow-2xs"
+                >
+                  Desativar Todas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSections(sections.map(s => ({ ...s, title: s.defaultTitle, enabled: true })))}
+                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                >
+                  <RotateCcw size={12} /> Restaurar Padrões
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body: Cards Grid */}
+            <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
               {sections.map((section, idx) => (
                 <div 
                   key={section.id}
-                  className={`border rounded-xl p-4 transition flex flex-col sm:flex-row items-start sm:items-center gap-4 ${
-                    section.enabled ? 'border-blue-200 bg-blue-50/20 shadow-xs' : 'border-gray-200 bg-gray-50 opacity-70'
+                  className={`rounded-2xl p-4.5 transition-all duration-200 flex flex-col justify-between border ${
+                    section.enabled 
+                      ? 'border-blue-500 bg-white shadow-md ring-2 ring-blue-100' 
+                      : 'border-gray-200 bg-gray-50/80 opacity-70 hover:opacity-90'
                   }`}
                 >
-                  <div className="flex items-center gap-3 w-full sm:w-auto">
-                    <input 
-                      type="checkbox"
-                      checked={section.enabled}
-                      onChange={e => updateSection(idx, { enabled: e.target.checked })}
-                      className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
-                      title="Exibir/Ocultar seção"
-                    />
-                    <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-800 flex items-center justify-center font-black text-xs shrink-0">
-                      {section.id}
+                  {/* Card Header: Icon + Section Number + Status Pill */}
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-3">
+                      {/* Prominent Icon Badge in Evidence */}
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-transform ${getSectionBadgeBg(section.iconName, section.enabled)}`}>
+                        {getSectionIcon(section.iconName, 24, section.enabled)}
+                      </div>
+
+                      <div>
+                        <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                          section.enabled ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-gray-200 text-gray-500'
+                        }`}>
+                          Seção {section.id < 10 ? `0${section.id}` : section.id}
+                        </span>
+                      </div>
                     </div>
-                    <div className="shrink-0">
-                      {getSectionIcon(section.iconName)}
-                    </div>
+
+                    {/* Toggle Button (Ativado / Desativado) */}
+                    <button
+                      type="button"
+                      onClick={() => updateSection(idx, { enabled: !section.enabled })}
+                      className={`px-3 py-1.5 rounded-full text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                        section.enabled
+                          ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                          : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                      }`}
+                      title={section.enabled ? "Clique para desativar esta seção" : "Clique para ativar esta seção"}
+                    >
+                      {section.enabled ? (
+                        <>
+                          <Check size={14} className="stroke-[3]" />
+                          <span>Ativado</span>
+                        </>
+                      ) : (
+                        <>
+                          <X size={14} className="stroke-[3]" />
+                          <span>Desativado</span>
+                        </>
+                      )}
+                    </button>
                   </div>
 
-                  <div className="flex-1 w-full">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Título da Seção {section.id}</label>
+                  {/* Card Title Input */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider">
+                        Título da Seção
+                      </label>
+                      {section.title !== section.defaultTitle && (
+                        <button
+                          type="button"
+                          onClick={() => updateSection(idx, { title: section.defaultTitle })}
+                          className="text-[10px] font-bold text-blue-600 hover:text-blue-800 transition flex items-center gap-1 cursor-pointer"
+                          title="Restaurar título padrão"
+                        >
+                          <RotateCcw size={11} /> Restaurar
+                        </button>
+                      )}
+                    </div>
+
                     <input 
                       type="text"
                       value={section.title}
+                      disabled={!section.enabled}
                       onChange={e => updateSection(idx, { title: e.target.value })}
-                      className="w-full text-xs font-bold text-gray-800 bg-white border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Título personalizado..."
+                      className={`w-full text-xs font-bold rounded-xl px-3 py-2 border transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        section.enabled 
+                          ? 'bg-white border-gray-300 text-gray-900' 
+                          : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                      }`}
+                      placeholder="Título da seção..."
                     />
                   </div>
-
-                  <button 
-                    type="button"
-                    onClick={() => updateSection(idx, { title: section.defaultTitle })}
-                    className="text-[10px] font-bold text-gray-500 hover:text-blue-700 whitespace-nowrap p-1.5 hover:bg-white rounded-md transition cursor-pointer self-end sm:self-center"
-                    title="Restaurar título padrão"
-                  >
-                    <RotateCcw size={14} className="inline mr-1" /> Restaurar
-                  </button>
                 </div>
               ))}
             </div>
 
+            {/* Modal Footer */}
             <div className="flex justify-between items-center px-6 py-4 border-t border-gray-100 bg-gray-50/50">
               <button 
                 type="button"
@@ -489,7 +587,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                 }}
                 className="text-xs font-bold text-gray-600 hover:text-gray-900 transition cursor-pointer flex items-center gap-1.5"
               >
-                <RotateCcw size={14} /> Restaurar Todas Padrões
+                <RotateCcw size={14} /> Restaurar Padrões
               </button>
 
               <div className="flex gap-3">
@@ -724,18 +822,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                     </td>
                   </tr>
 
-                  {/* Proporção da Dieta */}
-                  <tr className="bg-gray-50/50">
-                    <td className="py-2 px-3 font-bold text-gray-800">Proporção Concentrado : Volumoso (MN)</td>
-                    <td className="py-2 px-3 text-right font-bold text-orange-900 bg-orange-50/20 border-l border-orange-100">
-                      {currTotalMN > 0 ? `${((currAnimalConcDailyMN / currTotalMN) * 100).toFixed(0)}% C : ${((currAnimalVolDailyMN / currTotalMN) * 100).toFixed(0)}% V` : '-'}
-                    </td>
-                    <td className="py-2 px-3 text-right font-bold text-blue-900 bg-blue-50/20 border-l border-blue-100">
-                      {hasAdjustedDiet && adjTotalMN > 0 ? `${((adjAnimalConcDailyMN / adjTotalMN) * 100).toFixed(0)}% C : ${((adjAnimalVolDailyMN / adjTotalMN) * 100).toFixed(0)}% V` : '-'}
-                    </td>
-                    <td className="py-2 px-3 text-right text-gray-500 border-l border-gray-200">-</td>
-                    <td className="py-2 px-3 text-right font-bold border-l border-gray-200 text-gray-700">Ajustado</td>
-                  </tr>
+
 
                   {/* Consumo Matéria Seca (CMS) Total */}
                   <tr className="bg-blue-50/40 font-black">
@@ -1518,8 +1605,8 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                       <td className="py-1.5 px-2 text-right font-bold text-orange-900">
                         {finAnimalConcDailyMN.toFixed(2)} kg
                       </td>
-                      <td className="py-1.5 px-2 text-right border-l border-emerald-100 text-emerald-800 text-[10px]">
-                        Méd: R$ {finConcRaw.sumMN > 0 ? (finConcRaw.sumCost / finConcRaw.sumMN).toFixed(2) : '0.00'}
+                      <td className="py-1.5 px-2 text-right border-l border-emerald-100 text-gray-400">
+                        -
                       </td>
                       <td className="py-1.5 px-2 text-right font-black text-emerald-900 bg-emerald-50/20">
                         R$ {finTotalConcCostDaily.toFixed(2)}
@@ -1583,8 +1670,8 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                       <td className="py-1.5 px-2 text-right font-bold text-green-900">
                         {finAnimalVolDailyMN.toFixed(2)} kg
                       </td>
-                      <td className="py-1.5 px-2 text-right border-l border-emerald-100 text-emerald-800 text-[10px]">
-                        Méd: R$ {finVolRaw.sumMN > 0 ? (finVolRaw.sumCost / finVolRaw.sumMN).toFixed(2) : '0.00'}
+                      <td className="py-1.5 px-2 text-right border-l border-emerald-100 text-gray-400">
+                        -
                       </td>
                       <td className="py-1.5 px-2 text-right font-black text-emerald-900 bg-emerald-50/20">
                         R$ {finTotalVolCostDaily.toFixed(2)}
@@ -1631,36 +1718,99 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
               </table>
             </div>
           </section>
+            </div>
+          )}
 
-          {/* Indicadores complementares de custo */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5">
-              <span className="text-[10px] font-bold text-gray-500 uppercase block mb-0.5">Custo por kg de Matéria Seca (CMS)</span>
-              <div className="text-base font-bold text-gray-800">
-                {finCostPerKgMS > 0 ? `R$ ${finCostPerKgMS.toFixed(2)} / kg MS` : '-'}
-              </div>
-              <span className="text-[10px] text-gray-400">Relação direta com eficiência biológica</span>
-            </div>
+          {/* ================= 9. CONSOLIDADO DA MISTURA DO LOTE ================= */}
+          {getSectionConfig(9).enabled && (
+            <section className="mb-6 break-inside-avoid">
+              <h3 className="text-xs font-bold text-blue-800 tracking-wider uppercase mb-2 flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+                  {getSectionConfig(9).title}
+                </span>
+                <span className="text-[11px] text-gray-400 lowercase font-normal">
+                  (Para {animais} {animais === 1 ? 'animal' : 'animais'} em {days} {days === 1 ? 'dia' : 'dias'})
+                </span>
+              </h3>
 
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5">
-              <span className="text-[10px] font-bold text-gray-500 uppercase block mb-0.5">Participação Financeira</span>
-              <div className="text-base font-bold text-gray-800">
-                {finTotalCostDailyPerAnimal > 0 
-                  ? `${((finTotalConcCostDaily / finTotalCostDailyPerAnimal) * 100).toFixed(0)}% Conc. : ${((finTotalVolCostDaily / finTotalCostDailyPerAnimal) * 100).toFixed(0)}% Vol.` 
-                  : '-'}
-              </div>
-              <span className="text-[10px] text-gray-400">Distribuição do orçamento diário</span>
-            </div>
+              <div className="border border-gray-200 rounded-xl overflow-x-auto print:overflow-visible bg-white">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-slate-800 text-white font-bold uppercase text-[10px] tracking-wider">
+                      <th className="py-2.5 px-3 text-left">Insumo</th>
+                      <th className="py-2.5 px-3 text-right">Mistura Diária (kg)</th>
+                      <th className="py-2.5 px-3 text-right">Mistura Total ({days} d)</th>
+                      <th className="py-2.5 px-3 text-right">Total MS (kg)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 tabular-nums">
+                    {/* Concentrado Total Consolidado */}
+                    <tr className="bg-orange-50/40 hover:bg-orange-50/70 font-semibold">
+                      <td className="py-2.5 px-3 font-bold text-orange-950 flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-orange-100 text-orange-800 border border-orange-200">
+                          (c)
+                        </span>
+                        <span>Total Concentrado</span>
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-bold text-orange-900">
+                        {(finAnimalConcDailyMN * animais).toFixed(2)} kg
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-black text-orange-950">
+                        {(finAnimalConcDailyMN * animais * days).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-bold text-gray-700">
+                        {(finTotalConcMSDaily * animais * days).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg MS
+                      </td>
+                    </tr>
 
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5">
-              <span className="text-[10px] font-bold text-gray-500 uppercase block mb-0.5">Volume Total em Toneladas</span>
-              <div className="text-base font-bold text-gray-800">
-                {((finTotalMN * animais * days) / 1000).toFixed(2)} toneladas MN
+                    {/* Volumosos Individuais */}
+                    {finAnimalVolItems.map(item => {
+                      const dailyBatchKg = item.mnVal * animais;
+                      const periodBatchKg = dailyBatchKg * days;
+                      const periodMSKg = item.msVal * animais * days;
+                      return (
+                        <tr key={item.id} className="hover:bg-green-50/20">
+                          <td className="py-2.5 px-3 font-medium text-gray-800 flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-green-100 text-green-800 border border-green-200">
+                              (v)
+                            </span>
+                            <span>{item.itemInfo.name}</span>
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-gray-800">
+                            {dailyBatchKg.toFixed(2)} kg
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-bold text-green-950">
+                            {periodBatchKg.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-gray-700">
+                            {periodMSKg.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg MS
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+
+                  {/* Total Geral do Lote */}
+                  <tfoot className="border-t-2 border-slate-800 font-black bg-slate-900 text-white text-xs">
+                    <tr>
+                      <td className="py-3 px-3 uppercase tracking-wider text-slate-200">
+                        TOTAL LOTE (MN)
+                      </td>
+                      <td className="py-3 px-3 text-right text-amber-300 font-bold">
+                        {((finAnimalConcDailyMN + finAnimalVolDailyMN) * animais).toFixed(2)} kg/dia
+                      </td>
+                      <td className="py-3 px-3 text-right text-amber-300 text-sm font-black">
+                        {((finAnimalConcDailyMN + finAnimalVolDailyMN) * animais * days).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg
+                      </td>
+                      <td className="py-3 px-3 text-right text-slate-200 font-bold">
+                        {((finTotalConcMSDaily + finTotalVolMSDaily) * animais * days).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg MS
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
-              <span className="text-[10px] text-gray-400">Demanda física de estocagem</span>
-            </div>
-          </div>
-            </div>
+            </section>
           )}
 
           {/* Empty state if all sections are disabled */}

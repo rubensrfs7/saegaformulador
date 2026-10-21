@@ -132,8 +132,8 @@ export default function CurrentDietSummary({ data, onJumpToReport, onProceedToAd
     const diff = value - target;
     const threshold = target * 0.02;
     if (Math.abs(diff) < threshold) return null;
-    if (diff < 0) return <ArrowUp size={14} className="text-red-500 stroke-[2.5]" title="Abaixo da exigência" />;
-    return <ArrowDown size={14} className="text-blue-500 stroke-[2.5]" title="Acima da exigência" />;
+    if (diff < 0) return <span title="Abaixo da exigência"><ArrowUp size={14} className="text-red-500 stroke-[2.5]" /></span>;
+    return <span title="Acima da exigência"><ArrowDown size={14} className="text-blue-500 stroke-[2.5]" /></span>;
   };
 
   const cmsCoveragePct = metaCMS > 0 ? (totalMS / metaCMS) * 100 : 0;

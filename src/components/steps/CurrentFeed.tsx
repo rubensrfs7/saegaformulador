@@ -212,9 +212,30 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
   const currentVolKg = data.currentVolumosoKg !== undefined ? data.currentVolumosoKg : '';
 
   const numConcKg = currentConcKg === '' ? 0 : Number(currentConcKg) || 0;
-  // Quando em modo "Ofertado por Animal", a quantidade diária de volumoso é a soma dos volumosos ofertados
-  const numVolKg = isVolAnimalMode ? volMN : (currentVolKg === '' ? 0 : Number(currentVolKg) || 0);
+  // Quando em modo "Total", se quantidade de animais for informada, calcula o consumo diário pela batida total ÷ animais
+  const volDailyFromBatch = animais > 0 ? (volMN / animais) : 0;
+  const numVolKg = isVolAnimalMode 
+    ? volMN 
+    : (animais > 0 ? volDailyFromBatch : (currentVolKg === '' ? 0 : Number(currentVolKg) || 0));
   const totalFeedMN = numConcKg + numVolKg;
+
+  // Sincroniza currentVolumosoKg e proporções automaticamente quando no modo Total
+  useEffect(() => {
+    if (!isVolAnimalMode && animais > 0 && volMN > 0) {
+      const calculatedVol = Number((volMN / animais).toFixed(2));
+      const newTotal = numConcKg + calculatedVol;
+      const newConcPct = newTotal > 0 ? Math.round((numConcKg / newTotal) * 100) : undefined;
+      const newVolPct = newTotal > 0 ? Math.round((calculatedVol / newTotal) * 100) : undefined;
+
+      if (data.currentVolumosoKg !== calculatedVol) {
+        updateData({
+          currentVolumosoKg: calculatedVol,
+          currentConcentradoPercent: newConcPct,
+          currentVolumosoPercent: newVolPct
+        });
+      }
+    }
+  }, [isVolAnimalMode, animais, volMN, numConcKg]);
 
   // Proportions in MN
   const calculatedConcPctMN = totalFeedMN > 0 ? (numConcKg / totalFeedMN) * 100 : 0;
@@ -235,8 +256,8 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
   const animalVolDailyCost = isVolAnimalMode
     ? resolvedVol.reduce((acc, entry) => acc + (entry.mnVal * entry.priceKg), 0)
     : resolvedVol.reduce((acc, entry) => {
-        const pct = volMN > 0 ? entry.mnVal / volMN : 0;
-        return acc + pct * numVolKg * entry.priceKg;
+        const itemDailyMN = animais > 0 ? entry.mnVal / animais : (volMN > 0 ? (entry.mnVal / volMN) * numVolKg : 0);
+        return acc + itemDailyMN * entry.priceKg;
       }, 0);
   const totalAnimalDailyCost = animalConcDailyCost + animalVolDailyCost;
   const formatBRL = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -248,7 +269,7 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
   const handleConcKgChange = (val: string) => {
     const updatedConcKg = val === '' ? '' : Number(val);
     const numConc = updatedConcKg === '' ? 0 : Number(updatedConcKg) || 0;
-    const numVol = isVolAnimalMode ? volMN : (currentVolKg === '' ? 0 : Number(currentVolKg) || 0);
+    const numVol = isVolAnimalMode ? volMN : (animais > 0 ? (volMN / animais) : (currentVolKg === '' ? 0 : Number(currentVolKg) || 0));
     const newTotal = numConc + numVol;
     const newConcPct = newTotal > 0 ? (numConc / newTotal) * 100 : 0;
     const newVolPct = newTotal > 0 ? (numVol / newTotal) * 100 : 0;
@@ -543,7 +564,10 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
               <div className="inline-flex items-center bg-gray-100/90 p-1 rounded-xl border border-gray-200 shadow-2xs">
                 <button
                   type="button"
-                  onClick={() => updateData({ currentVolumosoMode: 'total' })}
+                  onClick={() => {
+                    const resetVol = data.currentVolumosos.map(v => ({ ...v, mn: '' as number | '', ms: '' as number | '' }));
+                    updateData({ currentVolumosoMode: 'total', currentVolumosos: resetVol, currentVolumosoKg: '' });
+                  }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
                     !isVolAnimalMode
                       ? 'bg-white text-green-800 shadow-xs border border-green-200'
@@ -555,7 +579,10 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
                 </button>
                 <button
                   type="button"
-                  onClick={() => updateData({ currentVolumosoMode: 'animal' })}
+                  onClick={() => {
+                    const resetVol = data.currentVolumosos.map(v => ({ ...v, mn: '' as number | '', ms: '' as number | '' }));
+                    updateData({ currentVolumosoMode: 'animal', currentVolumosos: resetVol, currentVolumosoKg: '' });
+                  }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
                     isVolAnimalMode
                       ? 'bg-white text-green-800 shadow-xs border border-green-200'
@@ -649,8 +676,23 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
                         <td className="py-2.5 px-3 text-gray-700 font-bold text-xs sm:text-sm">
                           {pct.toFixed(1)}%
                         </td>
-                        <td className="py-2.5 px-3 text-green-700 font-bold text-xs" title="Consumo/Fornecimento diário por cabeça (kg MN/animal/dia)">
-                          {animalDailyMN > 0 ? `${animalDailyMN.toFixed(2)} kg` : '-'}
+                        <td 
+                          className="py-2.5 px-3 text-green-700 font-bold text-xs" 
+                          title={
+                            isVolAnimalMode 
+                              ? "Consumo/Fornecimento diário por cabeça (kg MN/animal/dia)" 
+                              : animais > 0 
+                                ? `Consumo diário: ${entry.mnVal} kg ÷ ${animais} animais = ${(entry.mnVal / animais).toFixed(2)} kg/dia`
+                                : "Informe a quantidade de animais no Perfil (Etapa 1) para calcular o consumo diário"
+                          }
+                        >
+                          {animalDailyMN > 0 ? (
+                            `${animalDailyMN.toFixed(2)} kg`
+                          ) : (entry.mnVal > 0 && animais <= 0 ? (
+                            <span className="text-[10px] text-amber-600 font-semibold" title="Informe a quantidade de animais no Perfil">def. animais</span>
+                          ) : (
+                            '-'
+                          ))}
                         </td>
                         <td className="py-2.5 px-3 bg-emerald-50/20 border-l border-emerald-100">
                           <div className="relative rounded-lg">
@@ -909,23 +951,46 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
                 </div>
               ) : (
                 <div className="mt-3">
-                  <label className="text-[11px] font-bold text-gray-500 uppercase block mb-1">
-                    Quantidade Fornecida (kg MN/animal/dia)
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      value={currentVolKg}
-                      onChange={(e) => handleVolKgChange(e.target.value)}
-                      className="w-full text-2xl font-black text-gray-900 border-2 border-green-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white shadow-2xs"
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
-                      kg MN
-                    </span>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-bold text-gray-500 uppercase">
+                      Quantidade Fornecida (kg MN/animal/dia)
+                    </label>
+                    {animais > 0 && volMN > 0 && (
+                      <span className="text-[10px] font-bold text-green-700 bg-green-100/80 px-2 py-0.5 rounded-md">
+                        ✓ Calculado ({volMN.toFixed(2)} kg ÷ {animais} anim.)
+                      </span>
+                    )}
                   </div>
+                  {animais > 0 ? (
+                    <div className="bg-white border-2 border-green-300 rounded-xl px-4 py-2.5 flex items-center justify-between shadow-2xs">
+                      <span className="text-2xl font-black text-green-900">
+                        {numVolKg > 0 ? numVolKg.toFixed(2) : '0.00'}
+                      </span>
+                      <span className="text-xs font-bold text-green-700">
+                        kg MN / cab / dia
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={currentVolKg}
+                        onChange={(e) => handleVolKgChange(e.target.value)}
+                        className="w-full text-2xl font-black text-gray-900 border-2 border-green-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white shadow-2xs"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
+                        kg MN
+                      </span>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-gray-500 mt-1.5">
+                    {animais > 0
+                      ? `Soma dos consumos diários calculada automaticamente (${volMN.toFixed(2)} kg batida total ÷ ${animais} animais do lote).`
+                      : 'Informe a quantidade de animais no Perfil (Etapa 1) para calcular o consumo/dia automaticamente.'}
+                  </p>
                 </div>
               )}
 

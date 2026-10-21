@@ -201,8 +201,12 @@ export default function AdjustedFeed({ data, updateData }: Props) {
 
   // Volumoso: % MS média da mistura e cálculo do consumo diário do animal
   const avgVolMSPercent = volMN > 0 ? (volMS / volMN) : 0;
-  // Se estiver no modo "Ofertado por Animal", o consumo diário é a soma do que foi ofertado
-  const animalVolDailyMN = isAdjVolAnimalMode ? volMN : (avgVolMSPercent > 0 ? metaVolumosoMS / avgVolMSPercent : 0);
+  // Se estiver no modo "Ofertado por Animal", o consumo diário é a soma do que foi ofertado.
+  // Se estiver no modo "Total", calcula o consumo diário dividindo a batida total pela quantidade de animais informada no Perfil.
+  const volDailyFromBatch = animais > 0 ? (volMN / animais) : 0;
+  const animalVolDailyMN = isAdjVolAnimalMode 
+    ? volMN 
+    : (animais > 0 ? volDailyFromBatch : (avgVolMSPercent > 0 ? metaVolumosoMS / avgVolMSPercent : 0));
 
   // Custos por Animal/Dia (R$/animal/dia)
   const animalConcDailyCost = resolvedConc.reduce((acc, entry) => {
@@ -860,7 +864,10 @@ export default function AdjustedFeed({ data, updateData }: Props) {
               <div className="inline-flex items-center bg-gray-100/90 p-1 rounded-xl border border-gray-200 shadow-2xs">
                 <button
                   type="button"
-                  onClick={() => updateData({ adjustedVolumosoMode: 'total' })}
+                  onClick={() => {
+                    const resetVol = data.adjustedVolumosos.map(v => ({ ...v, mn: '' as number | '', ms: '' as number | '' }));
+                    updateData({ adjustedVolumosoMode: 'total', adjustedVolumosos: resetVol });
+                  }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
                     !isAdjVolAnimalMode
                       ? 'bg-white text-green-800 shadow-xs border border-green-200'
@@ -872,7 +879,10 @@ export default function AdjustedFeed({ data, updateData }: Props) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => updateData({ adjustedVolumosoMode: 'animal' })}
+                  onClick={() => {
+                    const resetVol = data.adjustedVolumosos.map(v => ({ ...v, mn: '' as number | '', ms: '' as number | '' }));
+                    updateData({ adjustedVolumosoMode: 'animal', adjustedVolumosos: resetVol });
+                  }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
                     isAdjVolAnimalMode
                       ? 'bg-white text-green-800 shadow-xs border border-green-200'
@@ -967,8 +977,23 @@ export default function AdjustedFeed({ data, updateData }: Props) {
                         <td className="py-2.5 px-3 text-gray-700 font-bold text-xs sm:text-sm">
                           {pct.toFixed(1)}%
                         </td>
-                        <td className="py-2.5 px-3 text-green-700 font-bold text-xs" title="Consumo/Fornecimento diário por cabeça (kg MN/animal/dia)">
-                          {animalDailyMN > 0 ? `${animalDailyMN.toFixed(2)} kg` : '-'}
+                        <td 
+                          className="py-2.5 px-3 text-green-700 font-bold text-xs" 
+                          title={
+                            isAdjVolAnimalMode
+                              ? "Consumo/Fornecimento diário por cabeça (kg MN/animal/dia)"
+                              : animais > 0
+                                ? `Consumo diário: ${entry.mnVal} kg ÷ ${animais} animais = ${(entry.mnVal / animais).toFixed(2)} kg/dia`
+                                : "Informe a quantidade de animais no Perfil (Etapa 1) para calcular o consumo diário"
+                          }
+                        >
+                          {animalDailyMN > 0 ? (
+                            `${animalDailyMN.toFixed(2)} kg`
+                          ) : (entry.mnVal > 0 && animais <= 0 ? (
+                            <span className="text-[10px] text-amber-600 font-semibold" title="Informe a quantidade de animais no Perfil">def. animais</span>
+                          ) : (
+                            '-'
+                          ))}
                         </td>
                         <td className="py-2.5 px-3 bg-emerald-50/20 border-l border-emerald-100">
                           <div className="relative rounded-lg">
@@ -1042,7 +1067,13 @@ export default function AdjustedFeed({ data, updateData }: Props) {
                   </>
                 ) : (
                   <>
-                    Meta atendida: <strong>{metaVolumosoMS.toFixed(2)} kg MS/dia</strong> ({animalVolDailyMN.toFixed(2)} kg MN/dia)
+                    Quantidade Fornecida Total: <strong>{animalVolDailyMN.toFixed(2)} kg MN/dia</strong> ({(animalVolDailyMN * avgVolMSPercent).toFixed(2)} kg MS)
+                    {animais > 0 && volMN > 0 && (
+                      <span className="ml-1 text-green-800 font-semibold">
+                        (Soma dos consumos: {volMN.toFixed(2)} kg ÷ {animais} anim.)
+                      </span>
+                    )}
+                    • Meta recomendada: {metaVolumosoMS.toFixed(2)} kg MS
                   </>
                 )}
               </span>
@@ -1208,7 +1239,12 @@ export default function AdjustedFeed({ data, updateData }: Props) {
                   </>
                 ) : (
                   <>
-                    Consumo individual: <strong>{animalVolDailyMN.toFixed(2)} kg MN/dia</strong> ({metaVolumosoMS.toFixed(2)} kg MS)
+                    Quantidade Fornecida (Consumo Individual): <strong>{animalVolDailyMN.toFixed(2)} kg MN/dia</strong> ({(animalVolDailyMN * avgVolMSPercent).toFixed(2)} kg MS)
+                    {animais > 0 && volMN > 0 && (
+                      <span className="block text-[11px] text-green-600 mt-0.5">
+                        Calculado automaticamente: {volMN.toFixed(2)} kg total ÷ {animais} animais
+                      </span>
+                    )}
                   </>
                 )}
               </div>

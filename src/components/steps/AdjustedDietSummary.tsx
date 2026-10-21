@@ -151,9 +151,8 @@ export default function AdjustedDietSummary({ data, onGoToReport }: Props) {
     if (!target) return null;
     const diff = value - target;
     const threshold = target * 0.02;
-    if (Math.abs(diff) < threshold) return null;
-    if (diff < 0) return <ArrowUp size={14} className="text-red-500 stroke-[2.5]" title="Abaixo da exigência" />;
-    return <ArrowDown size={14} className="text-blue-500 stroke-[2.5]" title="Acima da exigência" />;
+    if (diff < 0) return <span title="Abaixo da exigência"><ArrowUp size={14} className="text-red-500 stroke-[2.5]" /></span>;
+    return <span title="Acima da exigência"><ArrowDown size={14} className="text-blue-500 stroke-[2.5]" /></span>;
   };
 
   const concRatio = totalMS > 0 ? ((totalConcMS / totalMS) * 100).toFixed(0) : '0';

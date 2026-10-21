@@ -1,6 +1,12 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { useState } from 'react';
 import Header from './components/Header';
 import Stepper from './components/Stepper';
+import NavigationButtons from './components/NavigationButtons';
 import AnimalProfile from './components/steps/AnimalProfile';
 import CurrentFeed from './components/steps/CurrentFeed';
 import CurrentDietSummary from './components/steps/CurrentDietSummary';
@@ -8,188 +14,175 @@ import AdjustedFeed from './components/steps/AdjustedFeed';
 import AdjustedDietSummary from './components/steps/AdjustedDietSummary';
 import Report from './components/steps/Report';
 import DatabaseView from './components/database/DatabaseView';
-import NavigationButtons from './components/NavigationButtons';
-import { FormulationState, Step, ConsumptionTarget } from './types';
-
-const INITIAL_STATE: FormulationState = {
-  name: '',
-  category: '',
-  subcategory: '',
-  weight: '',
-  quantity: 1,
-  days: 1,
-  hasCurrentDiet: true,
-  currentConcentrates: [],
-  currentVolumosos: [],
-  currentVolumosoMode: 'total',
-  adjustedConcentrates: [],
-  adjustedVolumosos: [],
-  adjustedVolumosoMode: 'total',
-  reportSourceStep: undefined
-};
+import { Step, FormulationState } from './types';
+import { CONSUMPTION_TARGETS } from './data';
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<'formulator' | 'database'>('formulator');
   const [currentStep, setCurrentStep] = useState<Step>(1);
-  const [formulationData, setFormulationData] = useState<FormulationState>(INITIAL_STATE);
+  const [activeView, setActiveView] = useState<'formulator' | 'database'>('formulator');
 
-  const updateData = (data: Partial<FormulationState>) => {
-    setFormulationData(prev => ({ ...prev, ...data }));
+  // Estado inicial limpo (zerado) para o usuário montar do zero a partir do Perfil do Animal
+  const [data, setData] = useState<FormulationState>({
+    name: '',
+    category: '',
+    subcategory: '',
+    weight: '',
+    quantity: '',
+    days: '',
+    hasCurrentDiet: true,
+    currentVolumosoMode: 'total',
+    currentConcentradoKg: '',
+    currentVolumosoKg: '',
+    currentConcentradoPercent: '',
+    currentVolumosoPercent: '',
+    currentConcentrates: [],
+    currentVolumosos: [],
+    adjustedVolumosoMode: 'total',
+    adjustedConcentrates: [],
+    adjustedVolumosos: [],
+    reportSourceStep: 5
+  });
+
+  const updateData = (fields: Partial<FormulationState>) => {
+    setData(prev => ({ ...prev, ...fields }));
   };
 
-  const handleSelectTargetFromDatabase = (target: ConsumptionTarget) => {
+  const handleStepClick = (step: Step) => {
+    setActiveView('formulator');
+    setCurrentStep(step);
+  };
+
+  const handleSelectTargetFromDB = (target: (typeof CONSUMPTION_TARGETS)[0]) => {
     updateData({
       category: target.category,
       subcategory: target.subcategory,
       weight: target.pvReferencia
     });
+    setActiveView('formulator');
     setCurrentStep(1);
-    setCurrentView('formulator');
-  };
-
-  // Step 2 specific: "Não tenho dieta atual" -> skips directly to Step 4
-  const handleSkipCurrentDiet = () => {
-    updateData({ hasCurrentDiet: false });
-    setCurrentStep(4);
-  };
-
-  // Step 3 specific: Jump directly to Step 6 Report
-  const handleJumpToReportFromStep3 = () => {
-    updateData({ reportSourceStep: 3 });
-    setCurrentStep(6);
-  };
-
-  // Step 5 specific: Go to Step 6 Report
-  const handleGoToReportFromStep5 = () => {
-    updateData({ reportSourceStep: 5 });
-    setCurrentStep(6);
-  };
-
-  const handleStepClick = (step: Step) => {
-    // Ao abrir o relatório pelo Stepper, define a origem para não ficar presa
-    // em um valor antigo (ex.: relatório aberto antes pela Etapa 3).
-    if (step === 6 && currentStep !== 6) {
-      updateData({ reportSourceStep: currentStep === 3 ? 3 : 5 });
-    }
-    setCurrentStep(step);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans text-gray-800 pb-12">
-      <Header 
-        activeView={currentView}
-        onSelectView={setCurrentView}
+    <div className="min-h-screen bg-slate-50 text-gray-900 font-sans antialiased flex flex-col">
+      <Header
+        activeView={activeView}
+        onSelectView={view => setActiveView(view)}
       />
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-8 pt-8">
-        {currentView === 'database' ? (
+
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {activeView === 'database' ? (
           <DatabaseView
-            onBackToFormulator={() => setCurrentView('formulator')}
-            onSelectTargetForFormulation={handleSelectTargetFromDatabase}
+            onBackToFormulator={() => setActiveView('formulator')}
+            onSelectTargetForFormulation={handleSelectTargetFromDB}
           />
         ) : (
           <>
-            <Stepper currentStep={currentStep} onStepClick={handleStepClick} />
-            
-            <div className="mt-8">
-              {/* FASE 1: PERFIL DO ANIMAL */}
-              {currentStep === 1 && (
-                <>
-                  <AnimalProfile 
-                    data={formulationData} 
-                    updateData={updateData} 
-                    onOpenDatabase={() => setCurrentView('database')}
-                  />
-                  <NavigationButtons 
-                    onNext={() => setCurrentStep(2)} 
-                    nextLabel="Avançar para Dieta Atual"
-                  />
-                </>
-              )}
+            <Stepper
+              currentStep={currentStep}
+              onStepClick={handleStepClick}
+            />
 
-          {/* FASE 2: CONCENTRADO E VOLUMOSO ATUAL */}
-          {currentStep === 2 && (
-            <>
-              <CurrentFeed 
-                data={formulationData} 
-                updateData={updateData} 
-                onSkipToAdjusted={handleSkipCurrentDiet}
-              />
-              <NavigationButtons 
-                onPrev={() => setCurrentStep(1)}
-                onNext={() => {
-                  // Se o usuário havia clicado em "Não tenho dieta atual" e voltou,
-                  // avançar normalmente reativa a dieta atual.
-                  updateData({ hasCurrentDiet: true });
-                  setCurrentStep(3);
-                }}
-                nextLabel="Avançar para Resumo da Dieta Atual"
-              />
-            </>
-          )}
+            {currentStep === 1 && (
+              <>
+                <AnimalProfile
+                  data={data}
+                  updateData={updateData}
+                  onOpenDatabase={() => setActiveView('database')}
+                />
+                <NavigationButtons
+                  nextLabel="Avançar para Dieta Atual"
+                  onNext={() => setCurrentStep(2)}
+                />
+              </>
+            )}
 
-          {/* FASE 3: DIETA ATUAL CONSOLIDADA */}
-          {currentStep === 3 && (
-            <>
-              <CurrentDietSummary 
-                data={formulationData} 
-                onJumpToReport={handleJumpToReportFromStep3}
-                onProceedToAdjusted={() => setCurrentStep(4)}
-              />
-              <NavigationButtons 
-                onPrev={() => setCurrentStep(2)} 
-                onNext={() => setCurrentStep(4)} 
-                nextLabel="Avançar para Concentrado e Volumoso Ajustado"
-                onSkipToReport={handleJumpToReportFromStep3}
-                skipReportLabel="Pular para o Relatório (Pág. 6)"
-              />
-            </>
-          )}
+            {currentStep === 2 && (
+              <>
+                <CurrentFeed
+                  data={data}
+                  updateData={updateData}
+                  onSkipToAdjusted={() => setCurrentStep(4)}
+                />
+                <NavigationButtons
+                  prevLabel="Voltar ao Perfil"
+                  onPrev={() => setCurrentStep(1)}
+                  nextLabel="Avançar para Diagnóstico da Dieta Atual"
+                  onNext={() => setCurrentStep(3)}
+                  onSkipToReport={() => {
+                    updateData({ reportSourceStep: 3 });
+                    setCurrentStep(6);
+                  }}
+                  skipReportLabel="Relatório da Dieta Atual"
+                />
+              </>
+            )}
 
-          {/* FASE 4: CONCENTRADO E VOLUMOSO AJUSTADO */}
-          {currentStep === 4 && (
-            <>
-              <AdjustedFeed 
-                data={formulationData} 
-                updateData={updateData} 
-              />
-              <NavigationButtons 
-                onPrev={() => setCurrentStep(formulationData.hasCurrentDiet ? 3 : 2)} 
-                onNext={() => setCurrentStep(5)} 
-                nextLabel="Avançar para Dieta Ajustada"
-              />
-            </>
-          )}
+            {currentStep === 3 && (
+              <>
+                <CurrentDietSummary
+                  data={data}
+                  onJumpToReport={() => {
+                    updateData({ reportSourceStep: 3 });
+                    setCurrentStep(6);
+                  }}
+                  onProceedToAdjusted={() => setCurrentStep(4)}
+                />
+                <NavigationButtons
+                  prevLabel="Voltar para Insumos Atuais"
+                  onPrev={() => setCurrentStep(2)}
+                  nextLabel="Avançar para Formulação Ajustada"
+                  onNext={() => setCurrentStep(4)}
+                  onSkipToReport={() => {
+                    updateData({ reportSourceStep: 3 });
+                    setCurrentStep(6);
+                  }}
+                  skipReportLabel="Gerar Relatório Atual"
+                />
+              </>
+            )}
 
-          {/* FASE 5: DIETA AJUSTADA CONSOLIDADA */}
-          {currentStep === 5 && (
-            <>
-              <AdjustedDietSummary 
-                data={formulationData} 
-                onGoToReport={handleGoToReportFromStep5}
-              />
-              <NavigationButtons 
-                onPrev={() => setCurrentStep(4)} 
-                onNext={handleGoToReportFromStep5} 
-                nextLabel="Avançar para Relatório Final"
-              />
-            </>
-          )}
+            {currentStep === 4 && (
+              <>
+                <AdjustedFeed
+                  data={data}
+                  updateData={updateData}
+                />
+                <NavigationButtons
+                  prevLabel="Voltar"
+                  onPrev={() => setCurrentStep(data.hasCurrentDiet ? 3 : 2)}
+                  nextLabel="Avançar para Resumo da Dieta Ajustada"
+                  onNext={() => setCurrentStep(5)}
+                />
+              </>
+            )}
 
-          {/* FASE 6: RELATÓRIO */}
-          {currentStep === 6 && (
-            <>
-              <Report 
-                data={formulationData} 
+            {currentStep === 5 && (
+              <>
+                <AdjustedDietSummary
+                  data={data}
+                  onGoToReport={() => {
+                    updateData({ reportSourceStep: 5 });
+                    setCurrentStep(6);
+                  }}
+                />
+                <NavigationButtons
+                  prevLabel="Voltar aos Insumos Ajustados"
+                  onPrev={() => setCurrentStep(4)}
+                  nextLabel="Gerar Relatório Executivo"
+                  onNext={() => {
+                    updateData({ reportSourceStep: 5 });
+                    setCurrentStep(6);
+                  }}
+                />
+              </>
+            )}
+
+            {currentStep === 6 && (
+              <Report
+                data={data}
                 onNavigateToAdjusted={() => setCurrentStep(4)}
               />
-              <NavigationButtons 
-                onPrev={() => setCurrentStep(formulationData.reportSourceStep === 3 ? 3 : 5)} 
-                prevLabel={formulationData.reportSourceStep === 3 ? 'Voltar para Dieta Atual' : 'Voltar para Dieta Ajustada'}
-                isLast
-              />
-            </>
-          )}
-        </div>
+            )}
           </>
         )}
       </main>
