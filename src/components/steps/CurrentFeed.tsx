@@ -480,20 +480,20 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
           </div>
 
           {/* Subtotal Concentrado */}
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-[#fff8eb] border border-orange-100 rounded-xl px-5 py-3 mb-6 gap-3">
+          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center bg-[#fff8eb] border border-orange-100 rounded-xl px-5 py-3 mb-6 gap-3">
             <span className="text-xs font-bold text-orange-700 uppercase tracking-wide">
               Subtotal da Batelada de Concentrado
             </span>
-            <div className="flex flex-wrap gap-4 sm:gap-6 text-left sm:text-right">
-              <div>
+            <div className="flex items-center flex-nowrap shrink-0 gap-3 sm:gap-5 text-left sm:text-right overflow-x-auto max-w-full py-0.5">
+              <div className="whitespace-nowrap shrink-0">
                 <span className="text-[10px] font-bold text-orange-600 uppercase block">Total MN Batida</span>
                 <span className="text-base font-black text-orange-800">{concMN.toFixed(2)} kg</span>
               </div>
-              <div>
+              <div className="whitespace-nowrap shrink-0 border-l border-orange-200/80 pl-3 sm:pl-5">
                 <span className="text-[10px] font-bold text-orange-600 uppercase block">Total MS Batida</span>
                 <span className="text-base font-black text-orange-800">{concMS.toFixed(2)} kg</span>
               </div>
-              <div className="border-l border-orange-200 pl-4 sm:pl-6">
+              <div className="whitespace-nowrap shrink-0 border-l border-orange-200/80 pl-3 sm:pl-5">
                 <span className="text-[10px] font-bold text-emerald-700 uppercase block">Valor Médio Batida</span>
                 <span className="text-base font-black text-emerald-800">
                   {concMN > 0 && concCostTotal > 0 ? `R$ ${(concCostTotal / concMN).toFixed(2)}/kg` : '-'}
@@ -504,7 +504,7 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
                   </span>
                 )}
               </div>
-              <div className="border-l border-orange-200 pl-4 sm:pl-6">
+              <div className="whitespace-nowrap shrink-0 border-l border-orange-200/80 pl-3 sm:pl-5">
                 <span className="text-[10px] font-bold text-emerald-700 uppercase block">Custo p/ Animal</span>
                 <span className="text-base font-black text-emerald-800">
                   {animalConcDailyCost > 0 ? `R$ ${animalConcDailyCost.toFixed(2)}/dia` : '-'}
@@ -754,8 +754,8 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
           </div>
 
           {/* Subtotal Volumoso */}
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-[#ecfdf3] border border-green-100 rounded-xl px-5 py-3 mb-6 gap-3">
-            <div>
+          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center bg-[#ecfdf3] border border-green-100 rounded-xl px-5 py-3 mb-6 gap-3">
+            <div className="min-w-0">
               <span className="text-xs font-bold text-green-700 uppercase tracking-wide block">
                 {isVolAnimalMode ? 'Subtotal do Volumoso Ofertado (por Cabeça/Dia)' : 'Subtotal da Batelada de Volumoso'}
               </span>
@@ -765,20 +765,20 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
                 </span>
               )}
             </div>
-            <div className="flex flex-wrap gap-4 sm:gap-6 text-left sm:text-right">
-              <div>
+            <div className="flex items-center flex-nowrap shrink-0 gap-3 sm:gap-5 text-left sm:text-right overflow-x-auto max-w-full py-0.5">
+              <div className="whitespace-nowrap shrink-0">
                 <span className="text-[10px] font-bold text-green-600 uppercase block">
                   {isVolAnimalMode ? 'Ofertado MN / Cab' : 'Total MN Batida'}
                 </span>
                 <span className="text-base font-black text-green-800">{volMN.toFixed(2)} kg{isVolAnimalMode ? '/dia' : ''}</span>
               </div>
-              <div>
+              <div className="whitespace-nowrap shrink-0 border-l border-green-200/80 pl-3 sm:pl-5">
                 <span className="text-[10px] font-bold text-green-600 uppercase block">
                   {isVolAnimalMode ? 'Ofertado MS / Cab' : 'Total MS Batida'}
                 </span>
                 <span className="text-base font-black text-green-800">{volMS.toFixed(2)} kg{isVolAnimalMode ? '/dia' : ''}</span>
               </div>
-              <div className="border-l border-green-200 pl-4 sm:pl-6">
+              <div className="whitespace-nowrap shrink-0 border-l border-green-200/80 pl-3 sm:pl-5">
                 <span className="text-[10px] font-bold text-emerald-700 uppercase block">
                   {isVolAnimalMode ? 'Custo / Animal' : 'Valor Médio Batida'}
                 </span>
@@ -793,7 +793,7 @@ export default function CurrentFeed({ data, updateData, onSkipToAdjusted }: Prop
                   </span>
                 )}
               </div>
-              <div className="border-l border-green-200 pl-4 sm:pl-6">
+              <div className="whitespace-nowrap shrink-0 border-l border-green-200/80 pl-3 sm:pl-5">
                 <span className="text-[10px] font-bold text-emerald-700 uppercase block">
                   {isVolAnimalMode ? 'Custo Lote / Dia' : 'Custo p/ Animal'}
                 </span>

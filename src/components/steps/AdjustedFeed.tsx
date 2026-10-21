@@ -233,6 +233,39 @@ export default function AdjustedFeed({ data, updateData }: Props) {
   const totalLotePeriodCost = totalLoteDailyCost * days;
   const formatBRL = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+  // Resolução dos preços/custos da Dieta Atual (Passo 2) para comparação
+  let currConcMNVal = 0;
+  let currConcCostTotalVal = 0;
+  data.currentConcentrates.forEach(entry => {
+    const itemInfo = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
+    if (!itemInfo) return;
+    const mnVal = Number(entry.mn) || 0;
+    const priceKg = entry.pricePerKg !== undefined && entry.pricePerKg !== '' ? Number(entry.pricePerKg) : 0;
+    currConcMNVal += mnVal;
+    currConcCostTotalVal += mnVal * priceKg;
+  });
+  const currConcAvgPrice = currConcMNVal > 0 && currConcCostTotalVal > 0 ? currConcCostTotalVal / currConcMNVal : 0;
+
+  let currVolMNVal = 0;
+  let currVolCostTotalVal = 0;
+  data.currentVolumosos.forEach(entry => {
+    const itemInfo = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
+    if (!itemInfo) return;
+    const mnVal = Number(entry.mn) || 0;
+    const priceKg = entry.pricePerKg !== undefined && entry.pricePerKg !== '' ? Number(entry.pricePerKg) : 0;
+    currVolMNVal += mnVal;
+    currVolCostTotalVal += mnVal * priceKg;
+  });
+  const currVolAvgPrice = currVolMNVal > 0 && currVolCostTotalVal > 0 ? currVolCostTotalVal / currVolMNVal : 0;
+
+  const currAnimalConcKgVal = data.currentConcentradoKg !== undefined && data.currentConcentradoKg !== '' ? Number(data.currentConcentradoKg) : 0;
+  const currAnimalConcDailyCost = currConcAvgPrice > 0 && currAnimalConcKgVal > 0 ? currConcAvgPrice * currAnimalConcKgVal : 0;
+
+  const isCurrVolAnimalMode = data.currentVolumosoMode === 'animal';
+  const currAnimalVolDailyCost = isCurrVolAnimalMode
+    ? currVolCostTotalVal
+    : (animais > 0 ? currVolCostTotalVal / animais : 0);
+
   // Resolução dos nutrientes da Dieta Atual (Passo 2) para comparação
   let currConcMS = 0;
   let currConcPB = 0;
@@ -721,8 +754,8 @@ export default function AdjustedFeed({ data, updateData }: Props) {
           </div>
 
           {/* Subtotal Concentrado */}
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-[#fff8eb] border border-orange-100 rounded-xl px-5 py-3.5 mb-6 gap-3">
-            <div>
+          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center bg-[#fff8eb] border border-orange-100 rounded-xl px-5 py-3.5 mb-6 gap-3">
+            <div className="min-w-0">
               <span className="text-xs font-bold text-orange-900 uppercase tracking-wide block">
                 Subtotal da Mistura de Concentrado
               </span>
@@ -730,31 +763,65 @@ export default function AdjustedFeed({ data, updateData }: Props) {
                 Meta atendida: <strong>{metaConcentradoMS.toFixed(2)} kg MS/dia</strong> ({animalConcDailyMN.toFixed(2)} kg MN/dia)
               </span>
             </div>
-            <div className="flex flex-wrap gap-4 sm:gap-6 text-left sm:text-right">
-              <div>
+            <div className="flex items-center flex-nowrap shrink-0 gap-3 sm:gap-5 text-left sm:text-right overflow-x-auto max-w-full py-0.5">
+              <div className="whitespace-nowrap shrink-0">
                 <span className="text-[10px] font-bold text-orange-600 uppercase block">Total Batida</span>
                 <span className="text-sm sm:text-base font-black text-orange-800">{concMN.toFixed(2)} kg MN</span>
               </div>
-              <div>
+              <div className="whitespace-nowrap shrink-0 border-l border-orange-200/80 pl-3 sm:pl-5">
                 <span className="text-[10px] font-bold text-orange-600 uppercase block">MS da Batida</span>
                 <span className="text-sm sm:text-base font-black text-orange-800">{concMS.toFixed(2)} kg MS</span>
               </div>
-              <div className="border-l border-orange-200 pl-4 sm:pl-6">
+              <div className="whitespace-nowrap shrink-0 border-l border-orange-200/80 pl-3 sm:pl-5">
                 <span className="text-[10px] font-bold text-emerald-700 uppercase block">Valor Médio Batida</span>
                 <span className="text-sm sm:text-base font-black text-emerald-800">
                   {concMN > 0 && concCostTotal > 0 ? `R$ ${(concCostTotal / concMN).toFixed(2)}/kg` : '-'}
                 </span>
                 {concCostTotal > 0 && (
                   <span className="text-[10px] text-emerald-700 font-medium block">
-                    Total: R$ {concCostTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    Total: R$ {formatBRL(concCostTotal)}
+                  </span>
+                )}
+                {data.hasCurrentDiet && currConcAvgPrice > 0 && concMN > 0 && concCostTotal > 0 && (
+                  <span className="text-[9px] font-bold block mt-0.5">
+                    {concCostTotal / concMN < currConcAvgPrice ? (
+                      <span className="text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded border border-emerald-200" title={`Preço na Pág. 2: R$ ${currConcAvgPrice.toFixed(2)}/kg`}>
+                        ▼ -R$ {(currConcAvgPrice - (concCostTotal / concMN)).toFixed(2)}
+                      </span>
+                    ) : concCostTotal / concMN > currConcAvgPrice ? (
+                      <span className="text-amber-800 bg-amber-100/80 px-1.5 py-0.5 rounded border border-amber-200" title={`Preço na Pág. 2: R$ ${currConcAvgPrice.toFixed(2)}/kg`}>
+                        ▲ +R$ {((concCostTotal / concMN) - currConcAvgPrice).toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="text-gray-500 font-normal">
+                        = R$ 0.00
+                      </span>
+                    )}
                   </span>
                 )}
               </div>
-              <div className="border-l border-orange-200 pl-4 sm:pl-6">
+              <div className="whitespace-nowrap shrink-0 border-l border-orange-200/80 pl-3 sm:pl-5">
                 <span className="text-[10px] font-bold text-emerald-700 uppercase block">Custo p/ Animal</span>
                 <span className="text-sm sm:text-base font-black text-emerald-800">
                   {animalConcDailyCost > 0 ? `R$ ${animalConcDailyCost.toFixed(2)}/dia` : '-'}
                 </span>
+                {data.hasCurrentDiet && currAnimalConcDailyCost > 0 && animalConcDailyCost > 0 && (
+                  <span className="text-[9px] font-bold block mt-0.5">
+                    {animalConcDailyCost < currAnimalConcDailyCost ? (
+                      <span className="text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded border border-emerald-200" title={`Custo na Pág. 2: R$ ${currAnimalConcDailyCost.toFixed(2)}/dia`}>
+                        ▼ -R$ {(currAnimalConcDailyCost - animalConcDailyCost).toFixed(2)}
+                      </span>
+                    ) : animalConcDailyCost > currAnimalConcDailyCost ? (
+                      <span className="text-amber-800 bg-amber-100/80 px-1.5 py-0.5 rounded border border-amber-200" title={`Custo na Pág. 2: R$ ${currAnimalConcDailyCost.toFixed(2)}/dia`}>
+                        ▲ +R$ {(animalConcDailyCost - currAnimalConcDailyCost).toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="text-gray-500 font-normal">
+                        = R$ 0.00
+                      </span>
+                    )}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -1055,8 +1122,8 @@ export default function AdjustedFeed({ data, updateData }: Props) {
           </div>
 
           {/* Subtotal Volumoso */}
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-[#ecfdf3] border border-green-100 rounded-xl px-5 py-3.5 mb-6 gap-3">
-            <div>
+          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center bg-[#ecfdf3] border border-green-100 rounded-xl px-5 py-3.5 mb-6 gap-3">
+            <div className="min-w-0">
               <span className="text-xs font-bold text-green-700 uppercase tracking-wide block">
                 {isAdjVolAnimalMode ? 'Subtotal do Volumoso Ofertado (por Cabeça/Dia)' : 'Subtotal da Mistura de Volumoso'}
               </span>
@@ -1078,8 +1145,8 @@ export default function AdjustedFeed({ data, updateData }: Props) {
                 )}
               </span>
             </div>
-            <div className="flex flex-wrap gap-4 sm:gap-6 text-left sm:text-right">
-              <div>
+            <div className="flex items-center flex-nowrap shrink-0 gap-3 sm:gap-5 text-left sm:text-right overflow-x-auto max-w-full py-0.5">
+              <div className="whitespace-nowrap shrink-0">
                 <span className="text-[10px] font-bold text-green-600 uppercase block">
                   {isAdjVolAnimalMode ? 'Ofertado MN / Cab' : 'Total Batida'}
                 </span>
@@ -1087,7 +1154,7 @@ export default function AdjustedFeed({ data, updateData }: Props) {
                   {volMN.toFixed(2)} kg {isAdjVolAnimalMode ? '/dia' : 'MN'}
                 </span>
               </div>
-              <div>
+              <div className="whitespace-nowrap shrink-0 border-l border-green-200/80 pl-3 sm:pl-5">
                 <span className="text-[10px] font-bold text-green-600 uppercase block">
                   {isAdjVolAnimalMode ? 'Ofertado MS / Cab' : 'MS da Batida'}
                 </span>
@@ -1095,7 +1162,7 @@ export default function AdjustedFeed({ data, updateData }: Props) {
                   {volMS.toFixed(2)} kg {isAdjVolAnimalMode ? '/dia' : 'MS'}
                 </span>
               </div>
-              <div className="border-l border-green-200 pl-4 sm:pl-6">
+              <div className="whitespace-nowrap shrink-0 border-l border-green-200/80 pl-3 sm:pl-5">
                 <span className="text-[10px] font-bold text-emerald-700 uppercase block">
                   {isAdjVolAnimalMode ? 'Custo / Animal' : 'Valor Médio Batida'}
                 </span>
@@ -1109,8 +1176,25 @@ export default function AdjustedFeed({ data, updateData }: Props) {
                     Total: R$ {formatBRL(volCostTotal)}
                   </span>
                 )}
+                {data.hasCurrentDiet && currVolAvgPrice > 0 && volMN > 0 && volCostTotal > 0 && !isAdjVolAnimalMode && (
+                  <span className="text-[9px] font-bold block mt-0.5">
+                    {volCostTotal / volMN < currVolAvgPrice ? (
+                      <span className="text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded border border-emerald-200" title={`Preço na Pág. 2: R$ ${currVolAvgPrice.toFixed(2)}/kg`}>
+                        ▼ -R$ {(currVolAvgPrice - (volCostTotal / volMN)).toFixed(2)}
+                      </span>
+                    ) : volCostTotal / volMN > currVolAvgPrice ? (
+                      <span className="text-amber-800 bg-amber-100/80 px-1.5 py-0.5 rounded border border-amber-200" title={`Preço na Pág. 2: R$ ${currVolAvgPrice.toFixed(2)}/kg`}>
+                        ▲ +R$ {((volCostTotal / volMN) - currVolAvgPrice).toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="text-gray-500 font-normal">
+                        = R$ 0.00
+                      </span>
+                    )}
+                  </span>
+                )}
               </div>
-              <div className="border-l border-green-200 pl-4 sm:pl-6">
+              <div className="whitespace-nowrap shrink-0 border-l border-green-200/80 pl-3 sm:pl-5">
                 <span className="text-[10px] font-bold text-emerald-700 uppercase block">
                   {isAdjVolAnimalMode ? 'Custo Lote / Dia' : 'Custo p/ Animal'}
                 </span>
@@ -1119,6 +1203,23 @@ export default function AdjustedFeed({ data, updateData }: Props) {
                     ? (animalVolDailyCost * animais > 0 ? `R$ ${formatBRL(animalVolDailyCost * animais)}/dia` : '-')
                     : (animalVolDailyCost > 0 ? `R$ ${animalVolDailyCost.toFixed(2)}/dia` : '-')}
                 </span>
+                {data.hasCurrentDiet && currAnimalVolDailyCost > 0 && animalVolDailyCost > 0 && (
+                  <span className="text-[9px] font-bold block mt-0.5">
+                    {animalVolDailyCost < currAnimalVolDailyCost ? (
+                      <span className="text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded border border-emerald-200" title={`Custo na Pág. 2: R$ ${currAnimalVolDailyCost.toFixed(2)}/dia`}>
+                        ▼ -R$ {(currAnimalVolDailyCost - animalVolDailyCost).toFixed(2)}
+                      </span>
+                    ) : animalVolDailyCost > currAnimalVolDailyCost ? (
+                      <span className="text-amber-800 bg-amber-100/80 px-1.5 py-0.5 rounded border border-amber-200" title={`Custo na Pág. 2: R$ ${currAnimalVolDailyCost.toFixed(2)}/dia`}>
+                        ▲ +R$ {(animalVolDailyCost - currAnimalVolDailyCost).toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="text-gray-500 font-normal">
+                        = R$ 0.00
+                      </span>
+                    )}
+                  </span>
+                )}
               </div>
             </div>
           </div>

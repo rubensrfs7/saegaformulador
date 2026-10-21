@@ -77,22 +77,32 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
     }
   ]);
 
+  // Controle de inclusão de Dieta Atual no relatório (Pág. 2)
+  const [includeCurrentDiet, setIncludeCurrentDiet] = useState<boolean>(data.hasCurrentDiet);
+  const [includeCurrentDietBackup, setIncludeCurrentDietBackup] = useState<boolean | null>(null);
+
   // Cópia das seções ao abrir o modal, para que "Cancelar" descarte as alterações
   const [sectionsBackup, setSectionsBackup] = useState<typeof sections | null>(null);
 
+  const showCurrentInReport = includeCurrentDiet && data.hasCurrentDiet;
+
   const openCustomizingModal = () => {
     setSectionsBackup(sections.map(s => ({ ...s })));
+    setIncludeCurrentDietBackup(includeCurrentDiet);
     setIsCustomizingModalOpen(true);
   };
 
   const cancelCustomizingModal = () => {
     if (sectionsBackup) setSections(sectionsBackup);
+    if (includeCurrentDietBackup !== null) setIncludeCurrentDiet(includeCurrentDietBackup);
     setSectionsBackup(null);
+    setIncludeCurrentDietBackup(null);
     setIsCustomizingModalOpen(false);
   };
 
   const applyCustomizingModal = () => {
     setSectionsBackup(null);
+    setIncludeCurrentDietBackup(null);
     setIsCustomizingModalOpen(false);
   };
 
@@ -102,6 +112,19 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
 
   const getSectionConfig = (id: number) => {
     return sections.find(s => s.id === id) || { title: '', enabled: true, iconName: 'User' };
+  };
+
+  const getSectionTitle = (id: number) => {
+    const cfg = getSectionConfig(id);
+    let title = cfg.title;
+    if (!showCurrentInReport) {
+      title = title
+        .replace(': Comparativo Dieta Atual vs Dieta Ajustada', ': Dieta Ajustada')
+        .replace(': Dieta Atual vs Dieta Ajustada', ': Dieta Ajustada')
+        .replace(' Dieta Atual vs Dieta Ajustada vs Exigência', ' Dieta Ajustada vs Exigência')
+        .replace(' Dieta Atual vs Dieta Ajustada', ' Dieta Ajustada');
+    }
+    return title;
   };
 
   const getSectionIcon = (iconName: string, size = 20, enabled = true) => {
@@ -184,21 +207,21 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
   };
 
   // 1. Raw Batches
-  // Se o usuário clicou em "Não tenho dieta atual", a dieta atual é ignorada no relatório
-  const currConcRaw = resolveDietItems(data.hasCurrentDiet ? data.currentConcentrates : [], 'Concentrado');
-  const currVolRaw = resolveDietItems(data.hasCurrentDiet ? data.currentVolumosos : [], 'Volumoso');
+  // Se o usuário desativou a Dieta Atual no relatório ou clicou em "Não tenho dieta atual", ela é ignorada no relatório
+  const currConcRaw = resolveDietItems(showCurrentInReport ? data.currentConcentrates : [], 'Concentrado');
+  const currVolRaw = resolveDietItems(showCurrentInReport ? data.currentVolumosos : [], 'Volumoso');
 
   const adjConcRaw = resolveDietItems(data.adjustedConcentrates, 'Concentrado');
   const adjVolRaw = resolveDietItems(data.adjustedVolumosos, 'Volumoso');
 
   // ================= DIETA ATUAL (REAL DA FAZENDA) =================
   // Quantidade fornecida por animal definida na Etapa 2
-  const currAnimalConcDailyMN = !data.hasCurrentDiet ? 0 : data.currentConcentradoKg !== undefined && data.currentConcentradoKg !== '' 
+  const currAnimalConcDailyMN = !showCurrentInReport ? 0 : data.currentConcentradoKg !== undefined && data.currentConcentradoKg !== '' 
     ? Number(data.currentConcentradoKg) 
     : (currConcRaw.sumMN > 0 && currConcRaw.sumMN <= 25 ? currConcRaw.sumMN : 0);
 
   const isCurrVolAnimalMode = data.currentVolumosoMode === 'animal';
-  const currAnimalVolDailyMN = !data.hasCurrentDiet 
+  const currAnimalVolDailyMN = !showCurrentInReport 
     ? 0 
     : (isCurrVolAnimalMode 
         ? currVolRaw.sumMN 
@@ -482,7 +505,10 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSections(sections.map(s => ({ ...s, title: s.defaultTitle, enabled: true })))}
+                  onClick={() => {
+                    setSections(sections.map(s => ({ ...s, title: s.defaultTitle, enabled: true })));
+                    setIncludeCurrentDiet(data.hasCurrentDiet);
+                  }}
                   className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 transition cursor-pointer flex items-center gap-1 shadow-2xs"
                 >
                   <RotateCcw size={12} /> Restaurar Padrões
@@ -492,6 +518,66 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
 
             {/* Modal Body: Cards Grid */}
             <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Card Destaque: Incluir / Ocultar Dieta Atual */}
+              <div 
+                className={`col-span-1 md:col-span-2 rounded-2xl p-4.5 transition-all duration-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border ${
+                  includeCurrentDiet
+                    ? 'border-orange-500 bg-orange-50/40 shadow-md ring-2 ring-orange-200' 
+                    : 'border-gray-200 bg-gray-50/80 opacity-75'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-transform ${
+                    includeCurrentDiet 
+                      ? 'bg-orange-500 border border-orange-600 text-white shadow-sm' 
+                      : 'bg-gray-200/80 border border-gray-300 text-gray-400'
+                  }`}>
+                    <Layers size={24} className={includeCurrentDiet ? 'text-white' : 'text-gray-400'} />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                        includeCurrentDiet ? 'bg-orange-100 text-orange-800 border border-orange-200' : 'bg-gray-200 text-gray-500'
+                      }`}>
+                        Filtro de Comparação
+                      </span>
+                    </div>
+                    <h4 className="text-sm font-black text-gray-900">
+                      Exibir Dados da Dieta Atual no Relatório
+                    </h4>
+                    <p className="text-[11px] text-gray-500 mt-0.5 max-w-xl">
+                      {includeCurrentDiet 
+                        ? 'O relatório exibirá resumos, colunas comparativas e dados da Dieta Atual da fazenda.'
+                        : 'Dados da Dieta Atual removidos. O relatório exibirá apenas a Dieta Ajustada e suas misturas.'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIncludeCurrentDiet(prev => !prev)}
+                  className={`px-4 py-2 rounded-full text-xs font-black transition flex items-center gap-1.5 cursor-pointer shrink-0 shadow-2xs ${
+                    includeCurrentDiet
+                      ? 'bg-orange-600 text-white hover:bg-orange-700'
+                      : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                  }`}
+                  title={includeCurrentDiet ? "Clique para remover a Dieta Atual do relatório" : "Clique para incluir a Dieta Atual no relatório"}
+                >
+                  {includeCurrentDiet ? (
+                    <>
+                      <Check size={14} className="stroke-[3]" />
+                      <span>Ativado</span>
+                    </>
+                  ) : (
+                    <>
+                      <X size={14} className="stroke-[3]" />
+                      <span>Desativado</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
               {sections.map((section, idx) => (
                 <div 
                   key={section.id}
@@ -584,6 +670,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                 type="button"
                 onClick={() => {
                   setSections(sections.map(s => ({ ...s, title: s.defaultTitle, enabled: true })));
+                  setIncludeCurrentDiet(data.hasCurrentDiet);
                 }}
                 className="text-xs font-bold text-gray-600 hover:text-gray-900 transition cursor-pointer flex items-center gap-1.5"
               >
@@ -698,7 +785,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
             <section className="mb-6 break-inside-avoid">
               <h3 className="text-xs font-bold text-blue-800 tracking-wider uppercase mb-2 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-blue-700"></span>
-                {getSectionConfig(1).title}
+                {getSectionTitle(1)}
               </h3>
               <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 flex flex-wrap gap-8 text-xs">
                 <div>
@@ -731,7 +818,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
               <h3 className="text-xs font-bold text-blue-800 tracking-wider uppercase mb-2 flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-blue-700"></span>
-                  {getSectionConfig(2).title}
+                  {getSectionTitle(2)}
                 </span>
                 <span className="text-[11px] text-gray-400 lowercase font-normal">
                   (Consumo por animal/dia)
@@ -743,119 +830,145 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                 <thead>
                   <tr className="bg-blue-50/80 border-b border-gray-200 text-blue-950 font-bold uppercase text-[10px]">
                     <th className="py-2.5 px-3 text-left">Parâmetro de Consumo</th>
-                    <th className="py-2.5 px-3 text-right bg-orange-50/50 text-orange-900 border-l border-orange-100">
-                      Dieta Atual (Fazenda)
-                    </th>
+                    {showCurrentInReport && (
+                      <th className="py-2.5 px-3 text-right bg-orange-50/50 text-orange-900 border-l border-orange-100">
+                        Dieta Atual (Fazenda)
+                      </th>
+                    )}
                     <th className="py-2.5 px-3 text-right bg-blue-50/70 text-blue-900 border-l border-blue-100">
                       Dieta Ajustada (Proposta)
                     </th>
                     <th className="py-2.5 px-3 text-right border-l border-gray-200 text-gray-600">
                       Meta Exigência (Perfil)
                     </th>
-                    <th className="py-2.5 px-3 text-right border-l border-gray-200 text-gray-600">
-                      Variação
-                    </th>
+                    {showCurrentInReport && (
+                      <th className="py-2.5 px-3 text-right border-l border-gray-200 text-gray-600">
+                        Variação
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {/* Total Concentrado MN */}
                   <tr>
                     <td className="py-2 px-3 font-bold text-gray-700">Total Concentrado (MN)</td>
-                    <td className="py-2 px-3 text-right font-black text-orange-900 bg-orange-50/20 border-l border-orange-100">
-                      {currAnimalConcDailyMN.toFixed(2)} kg/dia
-                    </td>
+                    {showCurrentInReport && (
+                      <td className="py-2 px-3 text-right font-black text-orange-900 bg-orange-50/20 border-l border-orange-100">
+                        {currAnimalConcDailyMN.toFixed(2)} kg/dia
+                      </td>
+                    )}
                     <td className="py-2 px-3 text-right font-black text-blue-900 bg-blue-50/20 border-l border-blue-100">
                       {hasAdjustedDiet ? `${adjAnimalConcDailyMN.toFixed(2)} kg/dia` : '-'}
                     </td>
                     <td className="py-2 px-3 text-right text-gray-500 border-l border-gray-200">-</td>
-                    <td className="py-2 px-3 text-right font-bold border-l border-gray-200 text-gray-700">
-                      {hasAdjustedDiet ? `${(adjAnimalConcDailyMN - currAnimalConcDailyMN >= 0 ? '+' : '')}${(adjAnimalConcDailyMN - currAnimalConcDailyMN).toFixed(2)} kg` : '-'}
-                    </td>
+                    {showCurrentInReport && (
+                      <td className="py-2 px-3 text-right font-bold border-l border-gray-200 text-gray-700">
+                        {hasAdjustedDiet ? `${(adjAnimalConcDailyMN - currAnimalConcDailyMN >= 0 ? '+' : '')}${(adjAnimalConcDailyMN - currAnimalConcDailyMN).toFixed(2)} kg` : '-'}
+                      </td>
+                    )}
                   </tr>
 
                   {/* Total Concentrado MS */}
                   <tr>
                     <td className="py-2 px-3 font-semibold text-gray-600 pl-6">↳ Concentrado em MS</td>
-                    <td className="py-2 px-3 text-right font-bold text-orange-800 bg-orange-50/20 border-l border-orange-100">
-                      {currTotalConcMS.toFixed(2)} kg MS
-                    </td>
+                    {showCurrentInReport && (
+                      <td className="py-2 px-3 text-right font-bold text-orange-800 bg-orange-50/20 border-l border-orange-100">
+                        {currTotalConcMS.toFixed(2)} kg MS
+                      </td>
+                    )}
                     <td className="py-2 px-3 text-right font-bold text-blue-800 bg-blue-50/20 border-l border-blue-100">
                       {hasAdjustedDiet ? `${adjTotalConcMS.toFixed(2)} kg MS` : '-'}
                     </td>
                     <td className="py-2 px-3 text-right font-medium text-gray-600 border-l border-gray-200">
                       {metaConcentradoMS.toFixed(2)} kg MS ({currentTarget?.concentradoPercent || 35}%)
                     </td>
-                    <td className="py-2 px-3 text-right font-bold border-l border-gray-200 text-gray-700">
-                      {hasAdjustedDiet ? `${(adjTotalConcMS - currTotalConcMS >= 0 ? '+' : '')}${(adjTotalConcMS - currTotalConcMS).toFixed(2)} kg` : '-'}
-                    </td>
+                    {showCurrentInReport && (
+                      <td className="py-2 px-3 text-right font-bold border-l border-gray-200 text-gray-700">
+                        {hasAdjustedDiet ? `${(adjTotalConcMS - currTotalConcMS >= 0 ? '+' : '')}${(adjTotalConcMS - currTotalConcMS).toFixed(2)} kg` : '-'}
+                      </td>
+                    )}
                   </tr>
 
                   {/* Total Volumoso MN */}
                   <tr>
                     <td className="py-2 px-3 font-bold text-gray-700">Total Volumoso (MN)</td>
-                    <td className="py-2 px-3 text-right font-black text-green-900 bg-orange-50/20 border-l border-orange-100">
-                      {currAnimalVolDailyMN.toFixed(2)} kg/dia
-                    </td>
+                    {showCurrentInReport && (
+                      <td className="py-2 px-3 text-right font-black text-green-900 bg-orange-50/20 border-l border-orange-100">
+                        {currAnimalVolDailyMN.toFixed(2)} kg/dia
+                      </td>
+                    )}
                     <td className="py-2 px-3 text-right font-black text-blue-900 bg-blue-50/20 border-l border-blue-100">
                       {hasAdjustedDiet ? `${adjAnimalVolDailyMN.toFixed(2)} kg/dia` : '-'}
                     </td>
                     <td className="py-2 px-3 text-right text-gray-500 border-l border-gray-200">-</td>
-                    <td className="py-2 px-3 text-right font-bold border-l border-gray-200 text-gray-700">
-                      {hasAdjustedDiet ? `${(adjAnimalVolDailyMN - currAnimalVolDailyMN >= 0 ? '+' : '')}${(adjAnimalVolDailyMN - currAnimalVolDailyMN).toFixed(2)} kg` : '-'}
-                    </td>
+                    {showCurrentInReport && (
+                      <td className="py-2 px-3 text-right font-bold border-l border-gray-200 text-gray-700">
+                        {hasAdjustedDiet ? `${(adjAnimalVolDailyMN - currAnimalVolDailyMN >= 0 ? '+' : '')}${(adjAnimalVolDailyMN - currAnimalVolDailyMN).toFixed(2)} kg` : '-'}
+                      </td>
+                    )}
                   </tr>
 
                   {/* Total Volumoso MS */}
                   <tr>
                     <td className="py-2 px-3 font-semibold text-gray-600 pl-6">↳ Volumoso em MS</td>
-                    <td className="py-2 px-3 text-right font-bold text-green-800 bg-orange-50/20 border-l border-orange-100">
-                      {currTotalVolMS.toFixed(2)} kg MS
-                    </td>
+                    {showCurrentInReport && (
+                      <td className="py-2 px-3 text-right font-bold text-green-800 bg-orange-50/20 border-l border-orange-100">
+                        {currTotalVolMS.toFixed(2)} kg MS
+                      </td>
+                    )}
                     <td className="py-2 px-3 text-right font-bold text-blue-800 bg-blue-50/20 border-l border-blue-100">
                       {hasAdjustedDiet ? `${adjTotalVolMS.toFixed(2)} kg MS` : '-'}
                     </td>
                     <td className="py-2 px-3 text-right font-medium text-gray-600 border-l border-gray-200">
                       {metaVolumosoMS.toFixed(2)} kg MS ({currentTarget?.volumosoPercent || 65}%)
                     </td>
-                    <td className="py-2 px-3 text-right font-bold border-l border-gray-200 text-gray-700">
-                      {hasAdjustedDiet ? `${(adjTotalVolMS - currTotalVolMS >= 0 ? '+' : '')}${(adjTotalVolMS - currTotalVolMS).toFixed(2)} kg` : '-'}
-                    </td>
+                    {showCurrentInReport && (
+                      <td className="py-2 px-3 text-right font-bold border-l border-gray-200 text-gray-700">
+                        {hasAdjustedDiet ? `${(adjTotalVolMS - currTotalVolMS >= 0 ? '+' : '')}${(adjTotalVolMS - currTotalVolMS).toFixed(2)} kg` : '-'}
+                      </td>
+                    )}
                   </tr>
-
-
 
                   {/* Consumo Matéria Seca (CMS) Total */}
                   <tr className="bg-blue-50/40 font-black">
                     <td className="py-2.5 px-3 text-blue-950 uppercase text-[11px]">Consumo Total Matéria Seca (CMS)</td>
-                    <td className="py-2.5 px-3 text-right text-orange-950 bg-orange-100/40 border-l border-orange-200 text-sm">
-                      {currTotalMS.toFixed(2)} kg MS
-                    </td>
+                    {showCurrentInReport && (
+                      <td className="py-2.5 px-3 text-right text-orange-950 bg-orange-100/40 border-l border-orange-200 text-sm">
+                        {currTotalMS.toFixed(2)} kg MS
+                      </td>
+                    )}
                     <td className="py-2.5 px-3 text-right text-blue-950 bg-blue-100/50 border-l border-blue-200 text-sm">
                       {hasAdjustedDiet ? `${adjTotalMS.toFixed(2)} kg MS` : '-'}
                     </td>
                     <td className="py-2.5 px-3 text-right text-blue-900 border-l border-blue-200 text-sm">
                       {metaCMS.toFixed(2)} kg MS
                     </td>
-                    <td className="py-2.5 px-3 text-right text-green-700 border-l border-blue-200">
-                      {hasAdjustedDiet ? `${(adjTotalMS - currTotalMS >= 0 ? '+' : '')}${(adjTotalMS - currTotalMS).toFixed(2)} kg` : '-'}
-                    </td>
+                    {showCurrentInReport && (
+                      <td className="py-2.5 px-3 text-right text-green-700 border-l border-blue-200">
+                        {hasAdjustedDiet ? `${(adjTotalMS - currTotalMS >= 0 ? '+' : '')}${(adjTotalMS - currTotalMS).toFixed(2)} kg` : '-'}
+                      </td>
+                    )}
                   </tr>
 
                   {/* Custo Estimado por Cabeça/Dia */}
                   <tr className="bg-emerald-50/40 font-black">
                     <td className="py-2.5 px-3 text-emerald-950 uppercase text-[11px]">Custo Estimado por Animal/Dia</td>
-                    <td className="py-2.5 px-3 text-right text-orange-950 bg-orange-100/40 border-l border-orange-200 text-sm">
-                      {currTotalCostDailyPerAnimal > 0 ? `R$ ${currTotalCostDailyPerAnimal.toFixed(2)}` : '-'}
-                    </td>
+                    {showCurrentInReport && (
+                      <td className="py-2.5 px-3 text-right text-orange-950 bg-orange-100/40 border-l border-orange-200 text-sm">
+                        {currTotalCostDailyPerAnimal > 0 ? `R$ ${currTotalCostDailyPerAnimal.toFixed(2)}` : '-'}
+                      </td>
+                    )}
                     <td className="py-2.5 px-3 text-right text-emerald-900 bg-emerald-100/50 border-l border-emerald-200 text-sm">
                       {hasAdjustedDiet && adjTotalCostDailyPerAnimal > 0 ? `R$ ${adjTotalCostDailyPerAnimal.toFixed(2)}` : '-'}
                     </td>
                     <td className="py-2.5 px-3 text-right text-gray-400 border-l border-gray-200 text-xs">-</td>
-                    <td className="py-2.5 px-3 text-right font-bold border-l border-gray-200 text-emerald-800">
-                      {hasAdjustedDiet && adjTotalCostDailyPerAnimal > 0 && currTotalCostDailyPerAnimal > 0 
-                        ? `${(adjTotalCostDailyPerAnimal - currTotalCostDailyPerAnimal >= 0 ? '+' : '')}R$ ${(adjTotalCostDailyPerAnimal - currTotalCostDailyPerAnimal).toFixed(2)}/dia` 
-                        : (hasAdjustedDiet && adjTotalCostDailyPerAnimal > 0 ? `R$ ${adjTotalCostDailyPerAnimal.toFixed(2)}/dia` : '-')}
-                    </td>
+                    {showCurrentInReport && (
+                      <td className="py-2.5 px-3 text-right font-bold border-l border-gray-200 text-emerald-800">
+                        {hasAdjustedDiet && adjTotalCostDailyPerAnimal > 0 && currTotalCostDailyPerAnimal > 0 
+                          ? `${(adjTotalCostDailyPerAnimal - currTotalCostDailyPerAnimal >= 0 ? '+' : '')}R$ ${(adjTotalCostDailyPerAnimal - currTotalCostDailyPerAnimal).toFixed(2)}/dia` 
+                          : (hasAdjustedDiet && adjTotalCostDailyPerAnimal > 0 ? `R$ ${adjTotalCostDailyPerAnimal.toFixed(2)}/dia` : '-')}
+                      </td>
+                    )}
                   </tr>
                 </tbody>
               </table>
@@ -869,7 +982,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
               <h3 className="text-xs font-bold text-blue-800 tracking-wider uppercase mb-2 flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-                  {getSectionConfig(3).title}
+                  {getSectionTitle(3)}
                 </span>
                 <span className="text-[11px] text-gray-400 lowercase font-normal">
                   (Mistura no Misturador - MN)
@@ -882,12 +995,16 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                   <tr className="bg-gray-50 border-b border-gray-200 font-bold uppercase text-[10px] text-gray-500">
                     <th className="py-2 px-3 text-left">Insumo</th>
                     <th className="py-2 px-3 text-center">Tipo</th>
-                    <th className="py-2 px-3 text-right bg-orange-50/60 text-orange-900 border-l border-orange-100">
-                      Dieta Atual (kg MN)
-                    </th>
-                    <th className="py-2 px-3 text-right bg-orange-50/60 text-orange-900">
-                      % Atual
-                    </th>
+                    {showCurrentInReport && (
+                      <>
+                        <th className="py-2 px-3 text-right bg-orange-50/60 text-orange-900 border-l border-orange-100">
+                          Dieta Atual (kg MN)
+                        </th>
+                        <th className="py-2 px-3 text-right bg-orange-50/60 text-orange-900">
+                          % Atual
+                        </th>
+                      </>
+                    )}
                     <th className="py-2 px-3 text-right bg-blue-50/70 text-blue-900 border-l border-blue-100">
                       Dieta Ajustada (kg MN)
                     </th>
@@ -920,12 +1037,16 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                             {type}
                           </span>
                         </td>
-                        <td className="py-2 px-3 text-right font-bold text-orange-900 bg-orange-50/20 border-l border-orange-100">
-                          {currItem ? `${currMn.toFixed(2)} kg` : '-'}
-                        </td>
-                        <td className="py-2 px-3 text-right text-orange-700 bg-orange-50/20 font-medium">
-                          {currPct !== '-' ? `${currPct}%` : '-'}
-                        </td>
+                        {showCurrentInReport && (
+                          <>
+                            <td className="py-2 px-3 text-right font-bold text-orange-900 bg-orange-50/20 border-l border-orange-100">
+                              {currItem ? `${currMn.toFixed(2)} kg` : '-'}
+                            </td>
+                            <td className="py-2 px-3 text-right text-orange-700 bg-orange-50/20 font-medium">
+                              {currPct !== '-' ? `${currPct}%` : '-'}
+                            </td>
+                          </>
+                        )}
                         <td className="py-2 px-3 text-right font-bold text-blue-900 bg-blue-50/20 border-l border-blue-100">
                           {adjItem ? `${adjMn.toFixed(2)} kg` : '-'}
                         </td>
@@ -937,7 +1058,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                   })}
                   {allConcIngredientIds.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-4 text-center text-gray-400 text-xs">
+                      <td colSpan={showCurrentInReport ? 6 : 4} className="py-4 text-center text-gray-400 text-xs">
                         Nenhum concentrado declarado
                       </td>
                     </tr>
@@ -948,12 +1069,16 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                     <td colSpan={2} className="py-2.5 px-3 uppercase text-gray-700 text-[10px]">
                       Total da Mistura de Concentrado (MN)
                     </td>
-                    <td className="py-2.5 px-3 text-right font-black text-orange-900 bg-orange-50/60 border-l border-orange-200">
-                      {currConcRaw.sumMN.toFixed(2)} kg MN
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-bold text-orange-800 bg-orange-50/60">
-                      100%
-                    </td>
+                    {showCurrentInReport && (
+                      <>
+                        <td className="py-2.5 px-3 text-right font-black text-orange-900 bg-orange-50/60 border-l border-orange-200">
+                          {currConcRaw.sumMN.toFixed(2)} kg MN
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-bold text-orange-800 bg-orange-50/60">
+                          100%
+                        </td>
+                      </>
+                    )}
                     <td className="py-2.5 px-3 text-right font-black text-blue-900 bg-blue-50/70 border-l border-blue-200">
                       {hasAdjustedDiet ? `${adjConcRaw.sumMN.toFixed(2)} kg MN` : '-'}
                     </td>
@@ -973,7 +1098,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
               <h3 className="text-xs font-bold text-blue-800 tracking-wider uppercase mb-2 flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-green-600"></span>
-                  {getSectionConfig(4).title}
+                  {getSectionTitle(4)}
                 </span>
                 <span className="text-[11px] text-gray-400 lowercase font-normal">
                   (Mistura / Fornecimento MN)
@@ -985,12 +1110,16 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 font-bold uppercase text-[10px] text-gray-500">
                     <th className="py-2 px-3 text-left">Insumo</th>
-                    <th className="py-2 px-3 text-right bg-orange-50/60 text-orange-900 border-l border-orange-100">
-                      Dieta Atual {isCurrVolAnimalMode ? '(kg/cab/dia)' : '(kg MN)'}
-                    </th>
-                    <th className="py-2 px-3 text-right bg-orange-50/60 text-orange-900">
-                      % Atual
-                    </th>
+                    {showCurrentInReport && (
+                      <>
+                        <th className="py-2 px-3 text-right bg-orange-50/60 text-orange-900 border-l border-orange-100">
+                          Dieta Atual {isCurrVolAnimalMode ? '(kg/cab/dia)' : '(kg MN)'}
+                        </th>
+                        <th className="py-2 px-3 text-right bg-orange-50/60 text-orange-900">
+                          % Atual
+                        </th>
+                      </>
+                    )}
                     <th className="py-2 px-3 text-right bg-blue-50/70 text-blue-900 border-l border-blue-100">
                       Dieta Ajustada {isAdjVolAnimalMode ? '(kg/cab/dia)' : '(kg MN)'}
                     </th>
@@ -1015,12 +1144,16 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                     return (
                       <tr key={ingId} className="hover:bg-gray-50/30">
                         <td className="py-2 px-3 font-semibold text-gray-800">{name}</td>
-                        <td className="py-2 px-3 text-right font-bold text-green-900 bg-orange-50/20 border-l border-orange-100">
-                          {currItem ? `${currMn.toFixed(2)} kg` : '-'}
-                        </td>
-                        <td className="py-2 px-3 text-right text-green-700 bg-orange-50/20 font-medium">
-                          {currPct !== '-' ? `${currPct}%` : '-'}
-                        </td>
+                        {showCurrentInReport && (
+                          <>
+                            <td className="py-2 px-3 text-right font-bold text-green-900 bg-orange-50/20 border-l border-orange-100">
+                              {currItem ? `${currMn.toFixed(2)} kg` : '-'}
+                            </td>
+                            <td className="py-2 px-3 text-right text-green-700 bg-orange-50/20 font-medium">
+                              {currPct !== '-' ? `${currPct}%` : '-'}
+                            </td>
+                          </>
+                        )}
                         <td className="py-2 px-3 text-right font-bold text-blue-900 bg-blue-50/20 border-l border-blue-100">
                           {adjItem ? `${adjMn.toFixed(2)} kg` : '-'}
                         </td>
@@ -1032,7 +1165,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                   })}
                   {allVolIngredientIds.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-4 text-center text-gray-400 text-xs">
+                      <td colSpan={showCurrentInReport ? 5 : 3} className="py-4 text-center text-gray-400 text-xs">
                         Nenhum volumoso declarado
                       </td>
                     </tr>
@@ -1043,12 +1176,16 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                     <td className="py-2.5 px-3 uppercase text-gray-700 text-[10px]">
                       Total do Volumoso (MN)
                     </td>
-                    <td className="py-2.5 px-3 text-right font-black text-green-900 bg-orange-50/60 border-l border-orange-200">
-                      {currVolRaw.sumMN.toFixed(2)} kg {isCurrVolAnimalMode ? '/cab/dia' : 'MN'}
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-bold text-green-800 bg-orange-50/60">
-                      100%
-                    </td>
+                    {showCurrentInReport && (
+                      <>
+                        <td className="py-2.5 px-3 text-right font-black text-green-900 bg-orange-50/60 border-l border-orange-200">
+                          {currVolRaw.sumMN.toFixed(2)} kg {isCurrVolAnimalMode ? '/cab/dia' : 'MN'}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-bold text-green-800 bg-orange-50/60">
+                          100%
+                        </td>
+                      </>
+                    )}
                     <td className="py-2.5 px-3 text-right font-black text-blue-900 bg-blue-50/70 border-l border-blue-200">
                       {hasAdjustedDiet ? `${adjVolRaw.sumMN.toFixed(2)} kg ${isAdjVolAnimalMode ? '/cab/dia' : 'MN'}` : '-'}
                     </td>
@@ -1068,7 +1205,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
               <h3 className="text-xs font-bold text-blue-800 tracking-wider uppercase mb-2 flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-blue-700"></span>
-                  {getSectionConfig(5).title}
+                  {getSectionTitle(5)}
                 </span>
                 <span className="text-[11px] text-gray-400 lowercase font-normal">
                   (Consumo individual consolidado)
@@ -1081,15 +1218,19 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                   <tr className="bg-gray-50 border-b border-gray-200 font-bold uppercase text-[10px] text-gray-500">
                     <th className="py-1.5 px-2 text-left">Insumo</th>
                     <th className="py-2 px-2 text-center">Tipo</th>
-                    <th className="py-1.5 px-2 text-right bg-orange-50/60 text-orange-900 border-l border-orange-100">
-                      Atual MN (kg)
-                    </th>
-                    <th className="py-1.5 px-2 text-right bg-orange-50/60 text-orange-900">
-                      Atual MS (kg)
-                    </th>
-                    <th className="py-1.5 px-2 text-right bg-orange-50/60 text-orange-900">
-                      % MS
-                    </th>
+                    {showCurrentInReport && (
+                      <>
+                        <th className="py-1.5 px-2 text-right bg-orange-50/60 text-orange-900 border-l border-orange-100">
+                          Atual MN (kg)
+                        </th>
+                        <th className="py-1.5 px-2 text-right bg-orange-50/60 text-orange-900">
+                          Atual MS (kg)
+                        </th>
+                        <th className="py-1.5 px-2 text-right bg-orange-50/60 text-orange-900">
+                          % MS
+                        </th>
+                      </>
+                    )}
                     <th className="py-1.5 px-2 text-right bg-blue-50/70 text-blue-900 border-l border-blue-100">
                       Ajust. MN (kg)
                     </th>
@@ -1129,15 +1270,19 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                             {type}
                           </span>
                         </td>
-                        <td className="py-1.5 px-2 text-right font-medium text-gray-800 bg-orange-50/20 border-l border-orange-100">
-                          {currItem ? `${currMn.toFixed(2)}` : '-'}
-                        </td>
-                        <td className="py-1.5 px-2 text-right font-bold text-orange-950 bg-orange-50/20">
-                          {currItem ? `${currMs.toFixed(2)}` : '-'}
-                        </td>
-                        <td className="py-1.5 px-2 text-right text-gray-500 bg-orange-50/20 font-semibold">
-                          {currPct !== '-' ? `${currPct}%` : '-'}
-                        </td>
+                        {showCurrentInReport && (
+                          <>
+                            <td className="py-1.5 px-2 text-right font-medium text-gray-800 bg-orange-50/20 border-l border-orange-100">
+                              {currItem ? `${currMn.toFixed(2)}` : '-'}
+                            </td>
+                            <td className="py-1.5 px-2 text-right font-bold text-orange-950 bg-orange-50/20">
+                              {currItem ? `${currMs.toFixed(2)}` : '-'}
+                            </td>
+                            <td className="py-1.5 px-2 text-right text-gray-500 bg-orange-50/20 font-semibold">
+                              {currPct !== '-' ? `${currPct}%` : '-'}
+                            </td>
+                          </>
+                        )}
                         <td className="py-1.5 px-2 text-right font-medium text-gray-800 bg-blue-50/20 border-l border-blue-100">
                           {adjItem ? `${adjMn.toFixed(2)}` : '-'}
                         </td>
@@ -1157,15 +1302,19 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                     <td colSpan={2} className="py-1.5 px-2 text-orange-800 uppercase text-[10px]">
                       Subtotal Concentrado (MN / MS)
                     </td>
-                    <td className="py-1.5 px-2 text-right font-bold text-orange-900 border-l border-orange-100">
-                      {currAnimalConcDailyMN.toFixed(2)} kg
-                    </td>
-                    <td className="py-1.5 px-2 text-right font-black text-orange-950">
-                      {currTotalConcMS.toFixed(2)} kg
-                    </td>
-                    <td className="py-1.5 px-2 text-right text-orange-700">
-                      {currTotalMS > 0 ? ((currTotalConcMS / currTotalMS) * 100).toFixed(0) : 0}%
-                    </td>
+                    {showCurrentInReport && (
+                      <>
+                        <td className="py-1.5 px-2 text-right font-bold text-orange-900 border-l border-orange-100">
+                          {currAnimalConcDailyMN.toFixed(2)} kg
+                        </td>
+                        <td className="py-1.5 px-2 text-right font-black text-orange-950">
+                          {currTotalConcMS.toFixed(2)} kg
+                        </td>
+                        <td className="py-1.5 px-2 text-right text-orange-700">
+                          {currTotalMS > 0 ? ((currTotalConcMS / currTotalMS) * 100).toFixed(0) : 0}%
+                        </td>
+                      </>
+                    )}
                     <td className="py-1.5 px-2 text-right font-bold text-blue-900 border-l border-blue-100">
                       {hasAdjustedDiet ? `${adjAnimalConcDailyMN.toFixed(2)} kg` : '-'}
                     </td>
@@ -1182,15 +1331,19 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                     <td colSpan={2} className="py-1.5 px-2 text-green-800 uppercase text-[10px]">
                       Subtotal Volumoso (MN / MS)
                     </td>
-                    <td className="py-1.5 px-2 text-right font-bold text-green-900 border-l border-orange-100">
-                      {currAnimalVolDailyMN.toFixed(2)} kg
-                    </td>
-                    <td className="py-1.5 px-2 text-right font-black text-green-950">
-                      {currTotalVolMS.toFixed(2)} kg
-                    </td>
-                    <td className="py-1.5 px-2 text-right text-green-700">
-                      {currTotalMS > 0 ? ((currTotalVolMS / currTotalMS) * 100).toFixed(0) : 0}%
-                    </td>
+                    {showCurrentInReport && (
+                      <>
+                        <td className="py-1.5 px-2 text-right font-bold text-green-900 border-l border-orange-100">
+                          {currAnimalVolDailyMN.toFixed(2)} kg
+                        </td>
+                        <td className="py-1.5 px-2 text-right font-black text-green-950">
+                          {currTotalVolMS.toFixed(2)} kg
+                        </td>
+                        <td className="py-1.5 px-2 text-right text-green-700">
+                          {currTotalMS > 0 ? ((currTotalVolMS / currTotalMS) * 100).toFixed(0) : 0}%
+                        </td>
+                      </>
+                    )}
                     <td className="py-1.5 px-2 text-right font-bold text-blue-900 border-l border-blue-100">
                       {hasAdjustedDiet ? `${adjAnimalVolDailyMN.toFixed(2)} kg` : '-'}
                     </td>
@@ -1207,15 +1360,19 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                     <td colSpan={2} className="py-2 px-2 uppercase tracking-wider">
                       TOTAL DIÁRIO POR CABEÇA
                     </td>
-                    <td className="py-2 px-2 text-right border-l border-blue-800 text-amber-300">
-                      {currTotalMN.toFixed(2)} kg MN
-                    </td>
-                    <td className="py-2 px-2 text-right text-white">
-                      {currTotalMS.toFixed(2)} kg MS
-                    </td>
-                    <td className="py-2 px-2 text-right text-blue-200">
-                      100%
-                    </td>
+                    {showCurrentInReport && (
+                      <>
+                        <td className="py-2 px-2 text-right border-l border-blue-800 text-amber-300">
+                          {currTotalMN.toFixed(2)} kg MN
+                        </td>
+                        <td className="py-2 px-2 text-right text-white">
+                          {currTotalMS.toFixed(2)} kg MS
+                        </td>
+                        <td className="py-2 px-2 text-right text-blue-200">
+                          100%
+                        </td>
+                      </>
+                    )}
                     <td className="py-2 px-2 text-right border-l border-blue-800 text-amber-300">
                       {hasAdjustedDiet ? `${adjTotalMN.toFixed(2)} kg MN` : '-'}
                     </td>
@@ -1238,7 +1395,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
               <h3 className="text-xs font-bold text-blue-800 tracking-wider uppercase mb-2 flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-blue-700"></span>
-                  {getSectionConfig(6).title}
+                  {getSectionTitle(6)}
                 </span>
                 <span className="text-[11px] text-gray-400 lowercase font-normal">
                   (Valores na Matéria Seca da Dieta)
@@ -1249,9 +1406,11 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                   <thead>
                     <tr className="bg-blue-50/80 border-b border-gray-200 text-blue-950 font-bold uppercase text-[10px]">
                       <th className="py-2.5 px-3 text-left">Nutriente</th>
-                      <th className="py-2.5 px-3 text-right bg-orange-50/60 text-orange-950 border-l border-orange-100">
-                        Dieta Atual (% e g/kg)
-                      </th>
+                      {showCurrentInReport && (
+                        <th className="py-2.5 px-3 text-right bg-orange-50/60 text-orange-950 border-l border-orange-100">
+                          Dieta Atual (% e g/kg)
+                        </th>
+                      )}
                       <th className="py-2.5 px-3 text-right bg-blue-50/70 text-blue-950 border-l border-blue-100">
                         Dieta Ajustada (% e g/kg)
                       </th>
@@ -1322,12 +1481,14 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                       return (
                         <tr key={idx} className="hover:bg-gray-50/30">
                           <td className="py-2.5 px-3 font-bold text-gray-800">{nut.label}</td>
-                          <td className="py-2.5 px-3 text-right bg-orange-50/20 border-l border-orange-100">
-                            <span className={`font-black ${nut.isPct ? 'text-gray-800' : getNutrientColor(nut.currVal, nut.target)}`}>
-                              {currPct}%
-                            </span>
-                            {!nut.isPct && <span className="text-[10px] text-gray-400 ml-1.5">({nut.currVal.toFixed(1)} g/kg)</span>}
-                          </td>
+                          {showCurrentInReport && (
+                            <td className="py-2.5 px-3 text-right bg-orange-50/20 border-l border-orange-100">
+                              <span className={`font-black ${nut.isPct ? 'text-gray-800' : getNutrientColor(nut.currVal, nut.target)}`}>
+                                {currPct}%
+                              </span>
+                              {!nut.isPct && <span className="text-[10px] text-gray-400 ml-1.5">({nut.currVal.toFixed(1)} g/kg)</span>}
+                            </td>
+                          )}
                           <td className="py-2.5 px-3 text-right bg-blue-50/20 border-l border-blue-100">
                             {hasAdjustedDiet ? (
                               <>
@@ -1367,7 +1528,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
               <h3 className="text-xs font-bold text-blue-800 tracking-wider uppercase mb-2 flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-blue-700"></span>
-                  {getSectionConfig(7).title} ({animais} Animais, {days} Dias)
+                  {getSectionTitle(7)} ({animais} Animais, {days} Dias)
                 </span>
                 <span className="text-[11px] text-gray-400 lowercase font-normal">
                   (Total do lote no período em MN)
@@ -1379,12 +1540,16 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200 font-bold uppercase text-[10px] text-gray-500">
                       <th className="py-2 px-3 text-left">Insumo</th>
-                      <th className="py-2 px-3 text-right bg-orange-50/60 text-orange-900 border-l border-orange-100">
-                        Atual Diária (MN)
-                      </th>
-                      <th className="py-2 px-3 text-right bg-orange-50/60 text-orange-900">
-                        Atual Total ({days} d)
-                      </th>
+                      {showCurrentInReport && (
+                        <>
+                          <th className="py-2 px-3 text-right bg-orange-50/60 text-orange-900 border-l border-orange-100">
+                            Atual Diária (MN)
+                          </th>
+                          <th className="py-2 px-3 text-right bg-orange-50/60 text-orange-900">
+                            Atual Total ({days} d)
+                          </th>
+                        </>
+                      )}
                       <th className="py-2 px-3 text-right bg-blue-50/70 text-blue-900 border-l border-blue-100">
                         Ajust. Diária (MN)
                       </th>
@@ -1409,12 +1574,16 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                       return (
                         <tr key={ingId} className="hover:bg-gray-50/30">
                           <td className="py-2 px-3 font-semibold text-gray-800">{name}</td>
-                          <td className="py-2 px-3 text-right font-medium text-orange-900 bg-orange-50/20 border-l border-orange-100">
-                            {currItem ? `${currDailyLot.toFixed(1)} kg` : '-'}
-                          </td>
-                          <td className="py-2 px-3 text-right font-bold text-orange-950 bg-orange-50/20">
-                            {currItem ? `${currTotalLot.toFixed(0)} kg` : '-'}
-                          </td>
+                          {showCurrentInReport && (
+                            <>
+                              <td className="py-2 px-3 text-right font-medium text-orange-900 bg-orange-50/20 border-l border-orange-100">
+                                {currItem ? `${currDailyLot.toFixed(1)} kg` : '-'}
+                              </td>
+                              <td className="py-2 px-3 text-right font-bold text-orange-950 bg-orange-50/20">
+                                {currItem ? `${currTotalLot.toFixed(0)} kg` : '-'}
+                              </td>
+                            </>
+                          )}
                           <td className="py-2 px-3 text-right font-medium text-blue-900 bg-blue-50/20 border-l border-blue-100">
                             {adjItem ? `${adjDailyLot.toFixed(1)} kg` : '-'}
                           </td>
@@ -1430,12 +1599,16 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
                       <td className="py-2.5 px-3 uppercase text-gray-700 text-[10px]">
                         Total Geral do Lote ({animais} Cab, {days} Dias)
                       </td>
-                      <td className="py-2.5 px-3 text-right font-black text-orange-900 bg-orange-50/60 border-l border-orange-200">
-                        {(currTotalMN * animais).toFixed(1)} kg/dia
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-black text-orange-950 bg-orange-50/60">
-                        {(currTotalMN * animais * days).toFixed(0)} kg MN
-                      </td>
+                      {showCurrentInReport && (
+                        <>
+                          <td className="py-2.5 px-3 text-right font-black text-orange-900 bg-orange-50/60 border-l border-orange-200">
+                            {(currTotalMN * animais).toFixed(1)} kg/dia
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-black text-orange-950 bg-orange-50/60">
+                            {(currTotalMN * animais * days).toFixed(0)} kg MN
+                          </td>
+                        </>
+                      )}
                       <td className="py-2.5 px-3 text-right font-black text-blue-900 bg-blue-50/70 border-l border-blue-200">
                         {hasAdjustedDiet ? `${(adjTotalMN * animais).toFixed(1)} kg/dia` : '-'}
                       </td>
@@ -1523,7 +1696,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
               <h3 className="text-xs font-bold text-blue-800 tracking-wider uppercase mb-2 flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
-                  {getSectionConfig(8).title}
+                  {getSectionTitle(8)}
                 </span>
                 <span className="text-[11px] text-gray-400 lowercase font-normal">
                   (Multiplicado por {animais} cabeças e {days} dias)
@@ -1727,7 +1900,7 @@ export default function Report({ data, onNavigateToAdjusted }: Props) {
               <h3 className="text-xs font-bold text-blue-800 tracking-wider uppercase mb-2 flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
-                  {getSectionConfig(9).title}
+                  {getSectionTitle(9)}
                 </span>
                 <span className="text-[11px] text-gray-400 lowercase font-normal">
                   (Para {animais} {animais === 1 ? 'animal' : 'animais'} em {days} {days === 1 ? 'dia' : 'dias'})
