@@ -21,8 +21,10 @@ const INITIAL_STATE: FormulationState = {
   hasCurrentDiet: true,
   currentConcentrates: [],
   currentVolumosos: [],
+  currentVolumosoMode: 'total',
   adjustedConcentrates: [],
   adjustedVolumosos: [],
+  adjustedVolumosoMode: 'total',
   reportSourceStep: undefined
 };
 
@@ -64,6 +66,11 @@ export default function App() {
   };
 
   const handleStepClick = (step: Step) => {
+    // Ao abrir o relatório pelo Stepper, define a origem para não ficar presa
+    // em um valor antigo (ex.: relatório aberto antes pela Etapa 3).
+    if (step === 6 && currentStep !== 6) {
+      updateData({ reportSourceStep: currentStep === 3 ? 3 : 5 });
+    }
     setCurrentStep(step);
   };
 
@@ -73,7 +80,7 @@ export default function App() {
         activeView={currentView}
         onSelectView={setCurrentView}
       />
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 pt-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-8 pt-8">
         {currentView === 'database' ? (
           <DatabaseView
             onBackToFormulator={() => setCurrentView('formulator')}
@@ -108,8 +115,13 @@ export default function App() {
                 onSkipToAdjusted={handleSkipCurrentDiet}
               />
               <NavigationButtons 
-                onPrev={() => setCurrentStep(1)} 
-                onNext={() => setCurrentStep(3)} 
+                onPrev={() => setCurrentStep(1)}
+                onNext={() => {
+                  // Se o usuário havia clicado em "Não tenho dieta atual" e voltou,
+                  // avançar normalmente reativa a dieta atual.
+                  updateData({ hasCurrentDiet: true });
+                  setCurrentStep(3);
+                }}
                 nextLabel="Avançar para Resumo da Dieta Atual"
               />
             </>

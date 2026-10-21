@@ -24,12 +24,14 @@ export interface FormulationState {
   hasCurrentDiet: boolean; // false if skipped via "Não tenho dieta atual"
   currentConcentrates: IngredientEntry[];
   currentVolumosos: IngredientEntry[];
+  currentVolumosoMode?: 'total' | 'animal'; // 'total' (batelada/total) or 'animal' (ofertado por animal/dia)
   currentConcentradoKg?: number | ''; // Fornecimento de concentrado por animal/dia (kg MN)
   currentVolumosoKg?: number | '';    // Fornecimento de volumoso por animal/dia (kg MN)
   currentConcentradoPercent?: number | ''; // Proporção % Concentrado (MN)
   currentVolumosoPercent?: number | '';    // Proporção % Volumoso (MN)
   adjustedConcentrates: IngredientEntry[];
   adjustedVolumosos: IngredientEntry[];
+  adjustedVolumosoMode?: 'total' | 'animal'; // 'total' (batelada/total) or 'animal' (ofertado por animal/dia)
   reportSourceStep?: 3 | 5; // Tracks if report was generated from Step 3 or Step 5
 }
 

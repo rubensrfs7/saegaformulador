@@ -44,8 +44,9 @@ export default function AdjustedDietSummary({ data, onGoToReport }: Props) {
   const avgConcMSPercent = batchConcMN > 0 ? (batchConcMS / batchConcMN) : 0;
   const animalConcDailyMN = avgConcMSPercent > 0 ? metaConcentradoMS / avgConcMSPercent : 0;
 
+  const isAdjVolAnimalMode = data.adjustedVolumosoMode === 'animal';
   const avgVolMSPercent = batchVolMN > 0 ? (batchVolMS / batchVolMN) : 0;
-  const animalVolDailyMN = avgVolMSPercent > 0 ? metaVolumosoMS / avgVolMSPercent : 0;
+  const animalVolDailyMN = isAdjVolAnimalMode ? batchVolMN : (avgVolMSPercent > 0 ? metaVolumosoMS / avgVolMSPercent : 0);
 
   const animais = Number(data.quantity) || 1;
   const days = Number(data.days) || 1;

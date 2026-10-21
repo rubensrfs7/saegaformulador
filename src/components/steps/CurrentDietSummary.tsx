@@ -39,13 +39,16 @@ export default function CurrentDietSummary({ data, onJumpToReport, onProceedToAd
   });
 
   // Quantidade real fornecida por animal da Etapa 2
+  const isVolAnimalMode = data.currentVolumosoMode === 'animal';
   const animalConcDailyMN = data.currentConcentradoKg !== undefined && data.currentConcentradoKg !== '' 
     ? Number(data.currentConcentradoKg) 
     : (batchConcMN > 0 && batchConcMN <= 25 ? batchConcMN : 0);
 
-  const animalVolDailyMN = data.currentVolumosoKg !== undefined && data.currentVolumosoKg !== '' 
-    ? Number(data.currentVolumosoKg) 
-    : (batchVolMN > 0 && batchVolMN <= 50 ? batchVolMN : 0);
+  const animalVolDailyMN = isVolAnimalMode
+    ? batchVolMN
+    : (data.currentVolumosoKg !== undefined && data.currentVolumosoKg !== '' 
+        ? Number(data.currentVolumosoKg) 
+        : (batchVolMN > 0 && batchVolMN <= 50 ? batchVolMN : 0));
 
   // Insumos distribuídos pela proporção da batelada e quantidade real por animal
   let totalConcMN = 0;

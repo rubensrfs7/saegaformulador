@@ -23,7 +23,7 @@ export default function NavigationButtons({
   skipReportLabel = 'Pular para o Relatório'
 }: Props) {
   return (
-    <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 pt-6 mb-8 w-full">
+    <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 pt-6 mb-8 w-full print:hidden">
       <div>
         {onPrev ? (
           <button 

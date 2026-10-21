@@ -1,5 +1,6 @@
 import { ChevronLeft, Database, Sparkles, FlaskConical } from 'lucide-react';
 import CowIcon from './icons/CowIcon';
+import { CONSUMPTION_TARGETS } from '../data';
 
 interface HeaderProps {
   activeView?: 'formulator' | 'database';
@@ -8,7 +9,7 @@ interface HeaderProps {
 
 export default function Header({ activeView = 'formulator', onSelectView }: HeaderProps) {
   return (
-    <header className="flex items-center bg-white border-b border-gray-100 px-4 sm:px-8 py-3.5 w-full h-20 sticky top-0 z-50 shadow-2xs">
+    <header className="flex items-center bg-white border-b border-gray-100 px-4 sm:px-8 py-3.5 w-full h-20 sticky top-0 z-50 shadow-2xs print:hidden">
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 w-full max-w-6xl mx-auto">
         <div className="flex items-center gap-3">
           <img 
@@ -52,7 +53,7 @@ export default function Header({ activeView = 'formulator', onSelectView }: Head
               <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                 activeView === 'database' ? 'bg-blue-100 text-blue-800' : 'bg-gray-200 text-gray-700'
               }`}>
-                18
+                {CONSUMPTION_TARGETS.length}
               </span>
             </button>
           </div>

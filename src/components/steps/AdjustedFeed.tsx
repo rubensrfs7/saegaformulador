@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Plus, Trash2, Copy, Sparkles, Scale, SlidersHorizontal, Info, RefreshCw, FlaskConical } from 'lucide-react';
 import { FormulationState, IngredientEntry } from '../../types';
 import { MOCK_INGREDIENTS, CONSUMPTION_TARGETS } from '../../data';
@@ -10,14 +9,14 @@ interface Props {
 }
 
 export default function AdjustedFeed({ data, updateData }: Props) {
-  const [lastBatchTarget, setLastBatchTarget] = useState<number>(1000);
-
   const currentTarget = CONSUMPTION_TARGETS.find(
     t => t.category === data.category && t.subcategory === data.subcategory
   );
   const weight = Number(data.weight) || 0;
   const animais = Number(data.quantity) || 1;
   const days = Number(data.days) || 1;
+  const volMode = data.adjustedVolumosoMode || 'total';
+  const isAdjVolAnimalMode = volMode === 'animal';
   
   // Metas do Perfil do Animal (Etapa 1)
   const metaCMS = currentTarget ? weight * (currentTarget.percentPvMs / 100) : weight * 0.03;
@@ -131,7 +130,8 @@ export default function AdjustedFeed({ data, updateData }: Props) {
     }));
     updateData({
       adjustedConcentrates: copiedConc,
-      adjustedVolumosos: copiedVol
+      adjustedVolumosos: copiedVol,
+      adjustedVolumosoMode: data.currentVolumosoMode || 'total'
     });
   };
 
@@ -201,7 +201,8 @@ export default function AdjustedFeed({ data, updateData }: Props) {
 
   // Volumoso: % MS média da mistura e cálculo do consumo diário do animal
   const avgVolMSPercent = volMN > 0 ? (volMS / volMN) : 0;
-  const animalVolDailyMN = avgVolMSPercent > 0 ? metaVolumosoMS / avgVolMSPercent : 0;
+  // Se estiver no modo "Ofertado por Animal", o consumo diário é a soma do que foi ofertado
+  const animalVolDailyMN = isAdjVolAnimalMode ? volMN : (avgVolMSPercent > 0 ? metaVolumosoMS / avgVolMSPercent : 0);
 
   // Custos por Animal/Dia (R$/animal/dia)
   const animalConcDailyCost = resolvedConc.reduce((acc, entry) => {
@@ -211,47 +212,194 @@ export default function AdjustedFeed({ data, updateData }: Props) {
     return acc + (animalDailyMN * entry.priceKg);
   }, 0);
 
-  const animalVolDailyCost = resolvedVol.reduce((acc, entry) => {
-    if (!entry) return acc;
-    const pct = volMN > 0 ? (entry.mnVal / volMN) : 0;
-    const animalDailyMN = pct * animalVolDailyMN;
-    return acc + (animalDailyMN * entry.priceKg);
-  }, 0);
+  const animalVolDailyCost = isAdjVolAnimalMode
+    ? resolvedVol.reduce((acc, entry) => {
+        if (!entry) return acc;
+        return acc + (entry.mnVal * entry.priceKg);
+      }, 0)
+    : resolvedVol.reduce((acc, entry) => {
+        if (!entry) return acc;
+        const pct = volMN > 0 ? (entry.mnVal / volMN) : 0;
+        const animalDailyMN = pct * animalVolDailyMN;
+        return acc + (animalDailyMN * entry.priceKg);
+      }, 0);
 
   const totalAnimalDailyCost = animalConcDailyCost + animalVolDailyCost;
   const totalLoteDailyCost = totalAnimalDailyCost * animais;
   const totalLotePeriodCost = totalLoteDailyCost * days;
+  const formatBRL = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  // Nutrientes exclusivos do Concentrado (calculados sobre a MS do concentrado)
-  const concNutrientCards = [
-    { label: 'PB', value: concMS > 0 ? concPB / concMS : 0, target: currentTarget?.pbTmr || 0, isTmrTarget: true },
-    { label: 'NDT', value: concMS > 0 ? concNDT / concMS : 0, target: currentTarget?.ndtTmr || 0, isTmrTarget: true },
-    { label: 'FDN', value: concMS > 0 ? concFDN / concMS : 0, target: currentTarget?.fdnTmr || 0, isTmrTarget: true },
-    { label: 'AMIDO', value: concMS > 0 ? concAmido / concMS : 0, target: (currentTarget?.amidoPercent || 0) * 10, isTmrTarget: true },
-    { label: 'CÁLCIO', value: concMS > 0 ? concCalcio / concMS : 0, target: 0, isTmrTarget: false },
-    { label: 'FÓSFORO', value: concMS > 0 ? concFosforo / concMS : 0, target: 0, isTmrTarget: false },
-  ];
+  // Resolução dos nutrientes da Dieta Atual (Passo 2) para comparação
+  let currConcMS = 0;
+  let currConcPB = 0;
+  let currConcNDT = 0;
+  let currConcFDN = 0;
+  let currConcAmido = 0;
+  let currConcCalcio = 0;
+  let currConcFosforo = 0;
 
-  // Nutrientes exclusivos do Volumoso (calculados sobre a MS do volumoso)
-  const volNutrientCards = [
-    { label: 'PB', value: volMS > 0 ? volPB / volMS : 0, target: currentTarget?.pbTmr || 0, isTmrTarget: true },
-    { label: 'NDT', value: volMS > 0 ? volNDT / volMS : 0, target: currentTarget?.ndtTmr || 0, isTmrTarget: true },
-    { label: 'FDN', value: volMS > 0 ? volFDN / volMS : 0, target: currentTarget?.fdnTmr || 0, isTmrTarget: true },
-    { label: 'AMIDO', value: volMS > 0 ? volAmido / volMS : 0, target: (currentTarget?.amidoPercent || 0) * 10, isTmrTarget: true },
-    { label: 'CÁLCIO', value: volMS > 0 ? volCalcio / volMS : 0, target: 0, isTmrTarget: false },
-    { label: 'FÓSFORO', value: volMS > 0 ? volFosforo / volMS : 0, target: 0, isTmrTarget: false },
-  ];
+  if (data.hasCurrentDiet) {
+    data.currentConcentrates.forEach(entry => {
+      const itemInfo = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
+      if (!itemInfo) return;
+      const mnVal = Number(entry.mn) || 0;
+      const msVal = entry.mn === '' ? 0 : mnVal * (itemInfo.msPercent / 100);
+      currConcMS += msVal;
+      currConcPB += msVal * itemInfo.pb;
+      currConcNDT += msVal * itemInfo.ndt;
+      currConcFDN += msVal * itemInfo.fdn;
+      currConcAmido += msVal * itemInfo.amido;
+      currConcCalcio += msVal * itemInfo.calcio;
+      currConcFosforo += msVal * itemInfo.fosforo;
+    });
+  }
 
-  // Função auxiliar de cores conforme pedido do usuário:
-  // Vermelho: abaixo da meta
-  // Amarelo: aproximando da meta
-  // Verde: dentro do aceitável / muito próximo para cima da meta
-  const getNutrientColor = (value: number, target: number) => {
-    if (!target) return 'text-gray-800';
-    if (value < target * 0.90) return 'text-red-500';
-    if (value < target * 0.98) return 'text-amber-500';
-    return 'text-green-600';
+  let currVolMS = 0;
+  let currVolPB = 0;
+  let currVolNDT = 0;
+  let currVolFDN = 0;
+  let currVolAmido = 0;
+  let currVolCalcio = 0;
+  let currVolFosforo = 0;
+
+  if (data.hasCurrentDiet) {
+    data.currentVolumosos.forEach(entry => {
+      const itemInfo = MOCK_INGREDIENTS.find(i => i.id === entry.ingredientId);
+      if (!itemInfo) return;
+      const mnVal = Number(entry.mn) || 0;
+      const msVal = entry.mn === '' ? 0 : mnVal * (itemInfo.msPercent / 100);
+      currVolMS += msVal;
+      currVolPB += msVal * itemInfo.pb;
+      currVolNDT += msVal * itemInfo.ndt;
+      currVolFDN += msVal * itemInfo.fdn;
+      currVolAmido += msVal * itemInfo.amido;
+      currVolCalcio += msVal * itemInfo.calcio;
+      currVolFosforo += msVal * itemInfo.fosforo;
+    });
+  }
+
+  const concCurrentPB = currConcMS > 0 ? currConcPB / currConcMS : null;
+  const concCurrentNDT = currConcMS > 0 ? currConcNDT / currConcMS : null;
+  const concCurrentFDN = currConcMS > 0 ? currConcFDN / currConcMS : null;
+  const concCurrentAmido = currConcMS > 0 ? currConcAmido / currConcMS : null;
+  const concCurrentCalcio = currConcMS > 0 ? currConcCalcio / currConcMS : null;
+  const concCurrentFosforo = currConcMS > 0 ? currConcFosforo / currConcMS : null;
+
+  const volCurrentPB = currVolMS > 0 ? currVolPB / currVolMS : null;
+  const volCurrentNDT = currVolMS > 0 ? currVolNDT / currVolMS : null;
+  const volCurrentFDN = currVolMS > 0 ? currVolFDN / currVolMS : null;
+  const volCurrentAmido = currVolMS > 0 ? currVolAmido / currVolMS : null;
+  const volCurrentCalcio = currVolMS > 0 ? currVolCalcio / currVolMS : null;
+  const volCurrentFosforo = currVolMS > 0 ? currVolFosforo / currVolMS : null;
+
+  const getNutrientComparison = (label: string, adjustedVal: number, currentVal: number | null, isVolumoso = false) => {
+    if (currentVal === null || currentVal === undefined || currentVal <= 0) {
+      return {
+        diff: 0,
+        status: 'neutral' as const,
+        statusLabel: 'Sem base atual',
+        hasCurrent: false
+      };
+    }
+
+    const diff = adjustedVal - currentVal;
+    const absDiff = Math.abs(diff);
+
+    if (absDiff < 0.1) {
+      return {
+        diff: 0,
+        status: 'equal' as const,
+        statusLabel: 'Igual ao Atual',
+        hasCurrent: true
+      };
+    }
+
+    if (label === 'PB') {
+      const isBetter = diff > 0;
+      return {
+        diff,
+        status: isBetter ? ('better' as const) : ('worse' as const),
+        statusLabel: isBetter ? 'Melhor (+Proteína)' : 'Menor (-Proteína)',
+        hasCurrent: true
+      };
+    }
+
+    if (label === 'NDT') {
+      const isBetter = diff > 0;
+      return {
+        diff,
+        status: isBetter ? ('better' as const) : ('worse' as const),
+        statusLabel: isBetter ? 'Melhor (+Energia)' : 'Menor (-Energia)',
+        hasCurrent: true
+      };
+    }
+
+    if (label === 'FDN') {
+      if (isVolumoso) {
+        return {
+          diff,
+          status: 'neutral' as const,
+          statusLabel: diff > 0 ? '+Fibra efetiva' : '-Fibra efetiva',
+          hasCurrent: true
+        };
+      } else {
+        const isBetter = diff < 0;
+        return {
+          diff,
+          status: isBetter ? ('better' as const) : ('worse' as const),
+          statusLabel: isBetter ? 'Melhor (Mais denso)' : 'Mais fibroso',
+          hasCurrent: true
+        };
+      }
+    }
+
+    if (label === 'AMIDO') {
+      const isBetter = diff > 0;
+      return {
+        diff,
+        status: isBetter ? ('better' as const) : ('neutral' as const),
+        statusLabel: isBetter ? 'Maior (+Amido)' : 'Menor (-Amido)',
+        hasCurrent: true
+      };
+    }
+
+    if (label === 'CÁLCIO' || label === 'FÓSFORO') {
+      const isBetter = diff > 0;
+      return {
+        diff,
+        status: isBetter ? ('better' as const) : ('worse' as const),
+        statusLabel: isBetter ? 'Melhor (+Mineral)' : 'Menor (-Mineral)',
+        hasCurrent: true
+      };
+    }
+
+    return {
+      diff,
+      status: diff > 0 ? ('better' as const) : ('worse' as const),
+      statusLabel: diff > 0 ? 'Maior' : 'Menor',
+      hasCurrent: true
+    };
   };
+
+  // Nutrientes exclusivos do Concentrado (calculados sobre a MS do concentrado) com comparação
+  const concNutrientCards = [
+    { label: 'PB', value: concMS > 0 ? concPB / concMS : 0, currValue: concCurrentPB, ...getNutrientComparison('PB', concMS > 0 ? concPB / concMS : 0, concCurrentPB, false) },
+    { label: 'NDT', value: concMS > 0 ? concNDT / concMS : 0, currValue: concCurrentNDT, ...getNutrientComparison('NDT', concMS > 0 ? concNDT / concMS : 0, concCurrentNDT, false) },
+    { label: 'FDN', value: concMS > 0 ? concFDN / concMS : 0, currValue: concCurrentFDN, ...getNutrientComparison('FDN', concMS > 0 ? concFDN / concMS : 0, concCurrentFDN, false) },
+    { label: 'AMIDO', value: concMS > 0 ? concAmido / concMS : 0, currValue: concCurrentAmido, ...getNutrientComparison('AMIDO', concMS > 0 ? concAmido / concMS : 0, concCurrentAmido, false) },
+    { label: 'CÁLCIO', value: concMS > 0 ? concCalcio / concMS : 0, currValue: concCurrentCalcio, ...getNutrientComparison('CÁLCIO', concMS > 0 ? concCalcio / concMS : 0, concCurrentCalcio, false) },
+    { label: 'FÓSFORO', value: concMS > 0 ? concFosforo / concMS : 0, currValue: concCurrentFosforo, ...getNutrientComparison('FÓSFORO', concMS > 0 ? concFosforo / concMS : 0, concCurrentFosforo, false) },
+  ];
+
+  // Nutrientes exclusivos do Volumoso (calculados sobre a MS do volumoso) com comparação
+  const volNutrientCards = [
+    { label: 'PB', value: volMS > 0 ? volPB / volMS : 0, currValue: volCurrentPB, ...getNutrientComparison('PB', volMS > 0 ? volPB / volMS : 0, volCurrentPB, true) },
+    { label: 'NDT', value: volMS > 0 ? volNDT / volMS : 0, currValue: volCurrentNDT, ...getNutrientComparison('NDT', volMS > 0 ? volNDT / volMS : 0, volCurrentNDT, true) },
+    { label: 'FDN', value: volMS > 0 ? volFDN / volMS : 0, currValue: volCurrentFDN, ...getNutrientComparison('FDN', volMS > 0 ? volFDN / volMS : 0, volCurrentFDN, true) },
+    { label: 'AMIDO', value: volMS > 0 ? volAmido / volMS : 0, currValue: volCurrentAmido, ...getNutrientComparison('AMIDO', volMS > 0 ? volAmido / volMS : 0, volCurrentAmido, true) },
+    { label: 'CÁLCIO', value: volMS > 0 ? volCalcio / volMS : 0, currValue: volCurrentCalcio, ...getNutrientComparison('CÁLCIO', volMS > 0 ? volCalcio / volMS : 0, volCurrentCalcio, true) },
+    { label: 'FÓSFORO', value: volMS > 0 ? volFosforo / volMS : 0, currValue: volCurrentFosforo, ...getNutrientComparison('FÓSFORO', volMS > 0 ? volFosforo / volMS : 0, volCurrentFosforo, true) },
+  ];
 
   // Botão de Ajustar:
   // "o botão de ajustar que vai aparecer depois e apenas para deixar mais alinhado com os dados que eu ofereci"
@@ -307,7 +455,8 @@ export default function AdjustedFeed({ data, updateData }: Props) {
       updateData({ adjustedConcentrates: updatedConc });
     }
 
-    if (volMN > 0) {
+    // No modo "Por Animal" o volumoso é kg/cabeça/dia, não uma batida: não redimensionar para 1.000 kg
+    if (volMN > 0 && !isAdjVolAnimalMode) {
       const scaleVol = 1000 / volMN;
       const updatedVol = data.adjustedVolumosos.map(v => {
         const itemInfo = MOCK_INGREDIENTS.find(i => i.id === v.ingredientId);
@@ -587,13 +736,13 @@ export default function AdjustedFeed({ data, updateData }: Props) {
                 <span className="text-sm sm:text-base font-black text-orange-800">{concMS.toFixed(2)} kg MS</span>
               </div>
               <div className="border-l border-orange-200 pl-4 sm:pl-6">
-                <span className="text-[10px] font-bold text-emerald-700 uppercase block">Valor Total Batida</span>
+                <span className="text-[10px] font-bold text-emerald-700 uppercase block">Valor Médio Batida</span>
                 <span className="text-sm sm:text-base font-black text-emerald-800">
-                  {concCostTotal > 0 ? `R$ ${concCostTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                  {concMN > 0 && concCostTotal > 0 ? `R$ ${(concCostTotal / concMN).toFixed(2)}/kg` : '-'}
                 </span>
-                {concMN > 0 && concCostTotal > 0 && (
+                {concCostTotal > 0 && (
                   <span className="text-[10px] text-emerald-700 font-medium block">
-                    Médio: R$ {(concCostTotal / concMN).toFixed(2)}/kg
+                    Total: R$ {concCostTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 )}
               </div>
@@ -606,24 +755,78 @@ export default function AdjustedFeed({ data, updateData }: Props) {
             </div>
           </div>
 
-          {/* Nutrientes Exclusivos do Concentrado */}
+          {/* Nutrientes do Concentrado Ajustado vs Atual */}
           <div>
-            <div className="text-xs font-bold text-orange-800 uppercase tracking-wider mb-3 flex items-center gap-2">
-              <span>🌾 Nutrientes do Concentrado Ajustado</span>
-              <span className="text-[10px] text-gray-400 font-normal lowercase">(calculado sobre a matéria seca da mistura de concentrado)</span>
+            <div className="text-xs font-bold text-orange-800 uppercase tracking-wider mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span>🌾 Nutrientes do Concentrado Ajustado</span>
+                <span className="text-[10px] text-gray-400 font-normal lowercase">(calculado sobre a matéria seca da mistura)</span>
+              </div>
+              {currConcMS > 0 ? (
+                <span className="text-[10px] font-bold text-orange-800 bg-orange-100/80 border border-orange-200 px-2 py-0.5 rounded-md">
+                  Comparando com Concentrado Atual (Passo 2)
+                </span>
+              ) : (
+                <span className="text-[10px] text-gray-400 italic">
+                  (Sem concentrado cadastrado na Dieta Atual)
+                </span>
+              )}
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-              {concNutrientCards.map((n, i) => (
-                <div key={i} className="bg-orange-50/40 border border-orange-100 rounded-xl p-3 text-center">
-                  <div className="text-[10px] font-bold text-orange-700 uppercase">{n.label}</div>
-                  <div className={`text-lg font-black mt-0.5 ${getNutrientColor(n.value, n.target)}`}>
-                    {(n.value / 10).toFixed(1)}%
+              {concNutrientCards.map((n, i) => {
+                const diff = n.diff;
+                const diffPercent = diff / 10;
+                return (
+                  <div key={i} className="bg-orange-50/50 border border-orange-200/80 rounded-xl p-3 flex flex-col justify-between shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-black text-orange-800 uppercase tracking-wider">{n.label}</span>
+                      {n.hasCurrent && (
+                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5 ${
+                          n.status === 'better'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                            : n.status === 'worse'
+                            ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                            : 'bg-gray-100 text-gray-600 border border-gray-200'
+                        }`}>
+                          {diff > 0.05 ? `▲ +${diffPercent.toFixed(1)}%` : diff < -0.05 ? `▼ ${diffPercent.toFixed(1)}%` : '='}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="my-1">
+                      <div className="text-lg font-black text-gray-950 leading-tight">
+                        {(n.value / 10).toFixed(1)}%
+                      </div>
+                      <div className="text-[10px] text-orange-700/80 font-medium">
+                        {n.value.toFixed(1)} g/kg
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-orange-200/60 mt-1 text-[10px] space-y-0.5">
+                      {n.hasCurrent && n.currValue !== null ? (
+                        <>
+                          <div className="flex justify-between items-center text-gray-500">
+                            <span>Atual:</span>
+                            <span className="font-bold text-gray-700">{(n.currValue / 10).toFixed(1)}%</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold text-gray-500">Status:</span>
+                            <span className={`font-black ${
+                              n.status === 'better' ? 'text-emerald-700' : n.status === 'worse' ? 'text-amber-800' : 'text-gray-600'
+                            }`}>
+                              {n.statusLabel}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-[9px] text-gray-400 text-center py-0.5">
+                          Sem dieta atual
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-[10px] text-orange-700/80 font-medium">
-                    {n.value.toFixed(1)} g/kg
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -632,17 +835,55 @@ export default function AdjustedFeed({ data, updateData }: Props) {
       {/* SECTION 2: VOLUMOSO AJUSTADO */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 sm:p-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <span className="w-3 h-3 rounded-full bg-green-500 shrink-0"></span>
                 <h3 className="text-lg sm:text-xl font-bold text-gray-800">2. Volumoso Ajustado</h3>
+                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                  isAdjVolAnimalMode 
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300' 
+                    : 'bg-green-50 text-green-800 border-green-200'
+                }`}>
+                  {isAdjVolAnimalMode ? '🐂 Modo: Por Animal' : '🏢 Modo: Total'}
+                </span>
               </div>
-              <p className="text-xs text-gray-500">
-                Digite a batida completa do volumoso (ex: 500kg ou 1000kg). O cálculo considerará a porcentagem da mistura sobre a meta de {metaVolumosoMS.toFixed(2)} kg MS de volumoso.
+              <p className="text-xs text-gray-500 leading-relaxed">
+                {isAdjVolAnimalMode
+                  ? 'Digite a quantidade de volumoso ofertada diretamente por animal (kg MN/cabeça/dia).'
+                  : `Digite a batida completa do volumoso (ex: 500kg ou 1000kg). O cálculo considerará a porcentagem da mistura sobre a meta de ${metaVolumosoMS.toFixed(2)} kg MS de volumoso.`}
               </p>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+              {/* Toggle Total vs Por Animal */}
+              <div className="inline-flex items-center bg-gray-100/90 p-1 rounded-xl border border-gray-200 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => updateData({ adjustedVolumosoMode: 'total' })}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                    !isAdjVolAnimalMode
+                      ? 'bg-white text-green-800 shadow-xs border border-green-200'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                  title="Informar a quantidade total da batida ou mistura no misturador"
+                >
+                  <span>🏢 Total</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateData({ adjustedVolumosoMode: 'animal' })}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                    isAdjVolAnimalMode
+                      ? 'bg-white text-green-800 shadow-xs border border-green-200'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                  title="Informar a quantidade ofertada por cabeça ao dia (kg MN/cab/dia)"
+                >
+                  <span>🐂 Por Animal</span>
+                </button>
+              </div>
+
               <button 
                 type="button"
                 onClick={addVolumoso}
@@ -660,15 +901,21 @@ export default function AdjustedFeed({ data, updateData }: Props) {
                 <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
                   <th className="py-3 px-3 w-28">Tipo</th>
                   <th className="py-3 px-3">Insumo</th>
-                  <th className="py-3 px-3 w-32">MN Batida (kg)</th>
-                  <th className="py-3 px-3 w-24">MS (kg)</th>
+                  <th className="py-3 px-3 w-36">
+                    {isAdjVolAnimalMode ? 'MN Ofertado (kg/dia)' : 'MN Batida (kg)'}
+                  </th>
+                  <th className="py-3 px-3 w-24">
+                    {isAdjVolAnimalMode ? 'MS (kg/dia)' : 'MS (kg)'}
+                  </th>
                   <th className="py-3 px-3 w-20">% Mistura</th>
-                  <th className="py-3 px-3 w-24">Consumo/Dia</th>
+                  <th className="py-3 px-3 w-28">
+                    {isAdjVolAnimalMode ? 'Ofertado/Cab' : 'Consumo/Dia'}
+                  </th>
                   <th className="py-3 px-3 w-32 bg-emerald-50/60 text-emerald-900 border-l border-emerald-100">
                     Preço (R$/kg)
                   </th>
-                  <th className="py-3 px-3 w-32 bg-emerald-50/60 text-emerald-900">
-                    Total (R$)
+                  <th className="py-3 px-3 w-36 bg-emerald-50/60 text-emerald-900">
+                    {isAdjVolAnimalMode ? 'Total (R$/cab/dia)' : 'Total (R$)'}
                   </th>
                   <th className="py-3 px-2 w-12 text-center">Ações</th>
                 </tr>
@@ -684,8 +931,9 @@ export default function AdjustedFeed({ data, updateData }: Props) {
                   resolvedVol.map(entry => {
                     if (!entry) return null;
                     const pct = volMN > 0 ? (entry.mnVal / volMN) * 100 : 0;
-                    const animalDailyMN = (pct / 100) * animalVolDailyMN;
+                    const animalDailyMN = isAdjVolAnimalMode ? entry.mnVal : (pct / 100) * animalVolDailyMN;
                     const animalDailyCost = animalDailyMN * entry.priceKg;
+                    const itemLotDailyCost = animalDailyCost * animais;
 
                     return (
                       <tr key={entry.id} className="hover:bg-green-50/20 transition-colors">
@@ -719,7 +967,7 @@ export default function AdjustedFeed({ data, updateData }: Props) {
                         <td className="py-2.5 px-3 text-gray-700 font-bold text-xs sm:text-sm">
                           {pct.toFixed(1)}%
                         </td>
-                        <td className="py-2.5 px-3 text-green-700 font-bold text-xs" title="Consumo calculado para a meta do animal">
+                        <td className="py-2.5 px-3 text-green-700 font-bold text-xs" title="Consumo/Fornecimento diário por cabeça (kg MN/animal/dia)">
                           {animalDailyMN > 0 ? `${animalDailyMN.toFixed(2)} kg` : '-'}
                         </td>
                         <td className="py-2.5 px-3 bg-emerald-50/20 border-l border-emerald-100">
@@ -739,12 +987,27 @@ export default function AdjustedFeed({ data, updateData }: Props) {
                           </div>
                         </td>
                         <td className="py-2.5 px-3 bg-emerald-50/20">
-                          <div className="font-black text-emerald-800 text-xs sm:text-sm">
-                            {entry.itemCostTotal > 0 ? `R$ ${entry.itemCostTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
-                          </div>
-                          {animalDailyCost > 0 && (
-                            <div className="text-[10px] text-emerald-700 font-semibold" title="Custo diário por animal">
-                              R$ {animalDailyCost.toFixed(2)}/cab/dia
+                          {isAdjVolAnimalMode ? (
+                            <div>
+                              <div className="font-black text-emerald-800 text-xs sm:text-sm">
+                                {animalDailyCost > 0 ? `R$ ${formatBRL(animalDailyCost)}/dia` : '-'}
+                              </div>
+                              {itemLotDailyCost > 0 && animais > 1 && (
+                                <div className="text-[10px] text-emerald-700 font-semibold" title={`Custo diário para o lote de ${animais} cabeças`}>
+                                  Lote: R$ {formatBRL(itemLotDailyCost)}/dia
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div>
+                              <div className="font-black text-emerald-800 text-xs sm:text-sm">
+                                {entry.itemCostTotal > 0 ? `R$ ${formatBRL(entry.itemCostTotal)}` : '-'}
+                              </div>
+                              {animalDailyCost > 0 && (
+                                <div className="text-[10px] text-emerald-700 font-semibold" title="Custo diário por animal">
+                                  R$ {animalDailyCost.toFixed(2)}/cab/dia
+                                </div>
+                              )}
                             </div>
                           )}
                         </td>
@@ -770,59 +1033,137 @@ export default function AdjustedFeed({ data, updateData }: Props) {
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-[#ecfdf3] border border-green-100 rounded-xl px-5 py-3.5 mb-6 gap-3">
             <div>
               <span className="text-xs font-bold text-green-700 uppercase tracking-wide block">
-                Subtotal da Mistura de Volumoso
+                {isAdjVolAnimalMode ? 'Subtotal do Volumoso Ofertado (por Cabeça/Dia)' : 'Subtotal da Mistura de Volumoso'}
               </span>
               <span className="text-xs text-green-700 font-medium">
-                Meta atendida: <strong>{metaVolumosoMS.toFixed(2)} kg MS/dia</strong> ({animalVolDailyMN.toFixed(2)} kg MN/dia)
+                {isAdjVolAnimalMode ? (
+                  <>
+                    Fornecido: <strong>{volMN.toFixed(2)} kg MN/dia</strong> ({volMS.toFixed(2)} kg MS) • Meta recomendada: {metaVolumosoMS.toFixed(2)} kg MS
+                  </>
+                ) : (
+                  <>
+                    Meta atendida: <strong>{metaVolumosoMS.toFixed(2)} kg MS/dia</strong> ({animalVolDailyMN.toFixed(2)} kg MN/dia)
+                  </>
+                )}
               </span>
             </div>
             <div className="flex flex-wrap gap-4 sm:gap-6 text-left sm:text-right">
               <div>
-                <span className="text-[10px] font-bold text-green-600 uppercase block">Total Batida</span>
-                <span className="text-sm sm:text-base font-black text-green-800">{volMN.toFixed(2)} kg MN</span>
+                <span className="text-[10px] font-bold text-green-600 uppercase block">
+                  {isAdjVolAnimalMode ? 'Ofertado MN / Cab' : 'Total Batida'}
+                </span>
+                <span className="text-sm sm:text-base font-black text-green-800">
+                  {volMN.toFixed(2)} kg {isAdjVolAnimalMode ? '/dia' : 'MN'}
+                </span>
               </div>
               <div>
-                <span className="text-[10px] font-bold text-green-600 uppercase block">MS da Batida</span>
-                <span className="text-sm sm:text-base font-black text-green-800">{volMS.toFixed(2)} kg MS</span>
+                <span className="text-[10px] font-bold text-green-600 uppercase block">
+                  {isAdjVolAnimalMode ? 'Ofertado MS / Cab' : 'MS da Batida'}
+                </span>
+                <span className="text-sm sm:text-base font-black text-green-800">
+                  {volMS.toFixed(2)} kg {isAdjVolAnimalMode ? '/dia' : 'MS'}
+                </span>
               </div>
               <div className="border-l border-green-200 pl-4 sm:pl-6">
-                <span className="text-[10px] font-bold text-emerald-700 uppercase block">Valor Total Batida</span>
-                <span className="text-sm sm:text-base font-black text-emerald-800">
-                  {volCostTotal > 0 ? `R$ ${volCostTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                <span className="text-[10px] font-bold text-emerald-700 uppercase block">
+                  {isAdjVolAnimalMode ? 'Custo / Animal' : 'Valor Médio Batida'}
                 </span>
-                {volMN > 0 && volCostTotal > 0 && (
+                <span className="text-sm sm:text-base font-black text-emerald-800">
+                  {isAdjVolAnimalMode
+                    ? (animalVolDailyCost > 0 ? `R$ ${formatBRL(animalVolDailyCost)}/dia` : '-')
+                    : (volMN > 0 && volCostTotal > 0 ? `R$ ${(volCostTotal / volMN).toFixed(2)}/kg` : '-')}
+                </span>
+                {!isAdjVolAnimalMode && volCostTotal > 0 && (
                   <span className="text-[10px] text-emerald-700 font-medium block">
-                    Médio: R$ {(volCostTotal / volMN).toFixed(2)}/kg
+                    Total: R$ {formatBRL(volCostTotal)}
                   </span>
                 )}
               </div>
               <div className="border-l border-green-200 pl-4 sm:pl-6">
-                <span className="text-[10px] font-bold text-emerald-700 uppercase block">Custo p/ Animal</span>
+                <span className="text-[10px] font-bold text-emerald-700 uppercase block">
+                  {isAdjVolAnimalMode ? 'Custo Lote / Dia' : 'Custo p/ Animal'}
+                </span>
                 <span className="text-sm sm:text-base font-black text-emerald-800">
-                  {animalVolDailyCost > 0 ? `R$ ${animalVolDailyCost.toFixed(2)}/dia` : '-'}
+                  {isAdjVolAnimalMode
+                    ? (animalVolDailyCost * animais > 0 ? `R$ ${formatBRL(animalVolDailyCost * animais)}/dia` : '-')
+                    : (animalVolDailyCost > 0 ? `R$ ${animalVolDailyCost.toFixed(2)}/dia` : '-')}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Nutrientes Exclusivos do Volumoso */}
+          {/* Nutrientes do Volumoso Ajustado vs Atual */}
           <div>
-            <div className="text-xs font-bold text-green-800 uppercase tracking-wider mb-3 flex items-center gap-2">
-              <span>🌿 Nutrientes do Volumoso Ajustado</span>
-              <span className="text-[10px] text-gray-400 font-normal lowercase">(calculado sobre a matéria seca da mistura de volumoso)</span>
+            <div className="text-xs font-bold text-green-800 uppercase tracking-wider mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span>🌿 Nutrientes do Volumoso Ajustado</span>
+                <span className="text-[10px] text-gray-400 font-normal lowercase">(calculado sobre a matéria seca da mistura)</span>
+              </div>
+              {currVolMS > 0 ? (
+                <span className="text-[10px] font-bold text-green-800 bg-green-100/80 border border-green-200 px-2 py-0.5 rounded-md">
+                  Comparando com Volumoso Atual (Passo 2)
+                </span>
+              ) : (
+                <span className="text-[10px] text-gray-400 italic">
+                  (Sem volumoso cadastrado na Dieta Atual)
+                </span>
+              )}
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-              {volNutrientCards.map((n, i) => (
-                <div key={i} className="bg-green-50/40 border border-green-100 rounded-xl p-3 text-center">
-                  <div className="text-[10px] font-bold text-green-700 uppercase">{n.label}</div>
-                  <div className={`text-lg font-black mt-0.5 ${getNutrientColor(n.value, n.target)}`}>
-                    {(n.value / 10).toFixed(1)}%
+              {volNutrientCards.map((n, i) => {
+                const diff = n.diff;
+                const diffPercent = diff / 10;
+                return (
+                  <div key={i} className="bg-green-50/50 border border-green-200/80 rounded-xl p-3 flex flex-col justify-between shadow-2xs hover:shadow-xs transition">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-black text-green-800 uppercase tracking-wider">{n.label}</span>
+                      {n.hasCurrent && (
+                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5 ${
+                          n.status === 'better'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                            : n.status === 'worse'
+                            ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                            : 'bg-gray-100 text-gray-600 border border-gray-200'
+                        }`}>
+                          {diff > 0.05 ? `▲ +${diffPercent.toFixed(1)}%` : diff < -0.05 ? `▼ ${diffPercent.toFixed(1)}%` : '='}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="my-1">
+                      <div className="text-lg font-black text-gray-950 leading-tight">
+                        {(n.value / 10).toFixed(1)}%
+                      </div>
+                      <div className="text-[10px] text-green-700/80 font-medium">
+                        {n.value.toFixed(1)} g/kg
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-green-200/60 mt-1 text-[10px] space-y-0.5">
+                      {n.hasCurrent && n.currValue !== null ? (
+                        <>
+                          <div className="flex justify-between items-center text-gray-500">
+                            <span>Atual:</span>
+                            <span className="font-bold text-gray-700">{(n.currValue / 10).toFixed(1)}%</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold text-gray-500">Status:</span>
+                            <span className={`font-black ${
+                              n.status === 'better' ? 'text-emerald-700' : n.status === 'worse' ? 'text-amber-800' : 'text-gray-600'
+                            }`}>
+                              {n.statusLabel}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-[9px] text-gray-400 text-center py-0.5">
+                          Sem volumoso atual
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-[10px] text-green-700/80 font-medium">
-                    {n.value.toFixed(1)} g/kg
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -855,17 +1196,30 @@ export default function AdjustedFeed({ data, updateData }: Props) {
 
             <div className="p-5 rounded-xl bg-green-50/60 border border-green-100">
               <div className="text-[10px] font-bold text-green-700 uppercase tracking-wider mb-1">
-                Mistura de Volumoso Cadastrada
+                {isAdjVolAnimalMode ? 'Volumoso Ajustado (Ofertado por Animal)' : 'Mistura de Volumoso Cadastrada'}
               </div>
               <div className="text-2xl font-black text-green-900">
-                {volMN.toFixed(2)} <span className="text-sm font-semibold">kg MN na batida</span>
+                {volMN.toFixed(2)} <span className="text-sm font-semibold">{isAdjVolAnimalMode ? 'kg MN / animal / dia' : 'kg MN na batida'}</span>
               </div>
               <div className="text-xs text-green-700 mt-2 font-medium">
-                Consumo individual: <strong>{animalVolDailyMN.toFixed(2)} kg MN/dia</strong> ({metaVolumosoMS.toFixed(2)} kg MS)
+                {isAdjVolAnimalMode ? (
+                  <>
+                    Fornecimento real: <strong>{volMS.toFixed(2)} kg MS/dia</strong> (Meta calculada: {metaVolumosoMS.toFixed(2)} kg MS)
+                  </>
+                ) : (
+                  <>
+                    Consumo individual: <strong>{animalVolDailyMN.toFixed(2)} kg MN/dia</strong> ({metaVolumosoMS.toFixed(2)} kg MS)
+                  </>
+                )}
               </div>
               {animalVolDailyCost > 0 && (
                 <div className="mt-2 pt-2 border-t border-green-200/60 text-xs font-bold text-green-900">
                   Custo Volumoso: <strong>R$ {animalVolDailyCost.toFixed(2)} / animal / dia</strong>
+                </div>
+              )}
+              {isAdjVolAnimalMode && animais > 1 && (
+                <div className="text-[11px] text-green-700 mt-1 font-semibold">
+                  Lote ({animais} cab): {(volMN * animais).toFixed(2)} kg MN/dia • R$ {formatBRL(animalVolDailyCost * animais)}/dia
                 </div>
               )}
             </div>
@@ -911,7 +1265,7 @@ export default function AdjustedFeed({ data, updateData }: Props) {
             </div>
 
             <div className="bg-white/95 p-4 rounded-xl border border-emerald-100 shadow-2xs">
-              <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Custo Diário do Rebanho</span>
+              <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Custo Diário do Lote</span>
               <div className="text-2xl font-black text-emerald-900">
                 {totalLoteDailyCost > 0 ? `R$ ${totalLoteDailyCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'R$ 0,00'}
                 <span className="text-xs font-medium text-gray-500 ml-1">/dia</span>

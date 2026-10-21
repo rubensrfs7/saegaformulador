@@ -18,7 +18,7 @@ export default function Stepper({ currentStep, onStepClick }: StepperProps) {
   ];
 
   return (
-    <div className="w-full relative px-2 sm:px-6 mb-8">
+    <div className="w-full relative mb-8 print:hidden">
       {/* Background track line */}
       <div className="hidden sm:block absolute left-[6%] right-[6%] top-6 h-[2px] bg-gray-200 -z-10"></div>
       
@@ -32,7 +32,7 @@ export default function Stepper({ currentStep, onStepClick }: StepperProps) {
         {steps.map((s) => {
           const isActive = currentStep === s.step;
           const isCompleted = currentStep > s.step;
-          const isClickable = onStepClick && (isCompleted || s.step <= currentStep);
+          const isClickable = !!onStepClick;
 
           return (
             <button
